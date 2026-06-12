@@ -1,13 +1,13 @@
 # Enterprise AWS Data Lakehouse ML System
 
-Production-grade end-to-end fraud/risk machine learning platform built on AWS, combining a lakehouse architecture, LightGBM-based modeling on ~600K transaction records, FastAPI serving, Kafka streaming, Airflow orchestration, monitoring, CI/CD, and Infrastructure as Code.
+Production-oriented end-to-end fraud/risk machine learning platform built on AWS, combining a lakehouse architecture, LightGBM-based modeling on ~600K transaction records, FastAPI serving, Kafka streaming, Airflow orchestration, monitoring, CI/CD, and Infrastructure as Code.
 
-This project is designed as a **full AI production system**, not a notebook-only workflow. It demonstrates how large-scale tabular data can move through a structured lakehouse pipeline into trained models, batch and streaming inference services, orchestrated workflows, monitored APIs, and cloud-ready deployment components.
+This project is designed as a **full, production-oriented AI engineering system**, not a notebook-only workflow. It demonstrates how large-scale tabular data can move through a structured lakehouse pipeline into trained models, batch and streaming inference services, orchestrated workflows, monitored APIs, and cloud-ready deployment components.
 
-> **Full AI Production System:** Lakehouse + LightGBM ML Pipeline + Batch Inference + Kafka Streaming + FastAPI API + Airflow Orchestration + Monitoring + CI/CD + AWS Deployment + Terraform IaC
+> **End-to-End AI Engineering System:** Lakehouse + LightGBM ML Pipeline + Batch Inference + Kafka Streaming + FastAPI API + Airflow Orchestration + Monitoring + CI/CD + AWS Deployment + Terraform IaC
 
 ![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Production-green)
+![FastAPI](https://img.shields.io/badge/FastAPI-API_Serving-green)
 ![LightGBM](https://img.shields.io/badge/LightGBM-Tabular_ML-success)
 ![Kafka](https://img.shields.io/badge/Kafka-Streaming-black)
 ![Airflow](https://img.shields.io/badge/Airflow-Orchestration-red)
@@ -43,7 +43,7 @@ The goal of this project is to build an enterprise-style ML platform that covers
 - orchestration with Airflow
 - monitoring and observability
 - CI/CD automation
-- rollback-aware production thinking
+- rollback-aware deployment thinking
 - AWS deployment structure
 - Terraform-based IaC foundation
 
@@ -55,12 +55,12 @@ The goal of this project is to build an enterprise-style ML platform that covers
 - LightGBM-based fraud/risk modeling workflow trained on ~600K transaction-level records
 - End-to-end ML pipeline with training, evaluation, thresholding, and artifact versioning
 - Batch inference and Kafka-based streaming inference
-- FastAPI production serving with health and metrics integration
+- FastAPI deployment-ready serving with health and metrics integration
 - Airflow DAG orchestration for retraining and batch scoring
 - Prometheus and Grafana monitoring stack
 - GitHub Actions CI/CD workflow
 - Terraform-based AWS infrastructure design
-- Rollback-aware production deployment thinking
+- Rollback-aware deployment planning
 
 ---
 
@@ -147,7 +147,7 @@ The project follows this logical flow:
 
 - Lakehouse-style data architecture
 - Batch + streaming ML workflows
-- FastAPI production inference service
+- FastAPI deployment-ready inference service
 - Kafka event pipeline
 - Airflow orchestration
 - Prometheus + Grafana monitoring
@@ -157,7 +157,7 @@ The project follows this logical flow:
 - Dockerized services
 - AWS deployment-ready architecture
 - Terraform infrastructure design
-- Rollback-aware production mindset
+- Rollback-aware engineering mindset
 
 ---
 
@@ -287,13 +287,23 @@ enterprise-aws-data-lakehouse-ml-system/
 └── requirements_full.txt
 ```
 ---
+
+## Contributing
+
+Contributions are welcome for documentation, tests, examples, setup improvements, and small focused fixes. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before starting work, and look for issues labeled `good first issue` for contributor-ready tasks.
+
+## AI Usage Disclosure
+
+This project was developed with selective assistance from AI tools such as ChatGPT and Codex. All AI-assisted outputs were reviewed, edited, and approved by the maintainer before being committed. See [AI_USAGE.md](AI_USAGE.md) for details.
+
 ---
+
 ## Author
 
-**Chathuranga Sudusinghe**  
+**Chathuranga Sudusinghe**
 AI Systems Engineer | Generative AI & LLM Architect | Production ML & MLOps | Decision-Centric AI Systems
 
-LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe  
+LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe
 GitHub: https://github.com/chathuranga-sudusinghe
 
 ---
