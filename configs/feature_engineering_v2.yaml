@@ -1,0 +1,218 @@
+feature_engineering_version: feature_engineering_v2
+baseline_model_version: v1
+target_model_version: v2
+target_column: isFraud
+
+id_columns:
+  - TransactionID
+
+required_raw_columns:
+  - TransactionDT
+  - TransactionAmt
+  - card1
+  - card2
+  - card3
+  - card4
+  - addr1
+
+optional_raw_columns:
+  - card5
+  - card6
+  - addr2
+  - P_emaildomain
+  - R_emaildomain
+  - ProductCD
+  - DeviceType
+  - DeviceInfo
+
+ignored_columns:
+  - isFraud
+
+leakage_risk_columns:
+  - uid_time_to_next
+  - future_transaction_count
+  - future_amount_mean
+  - post_event_label_features
+
+numerical_missing_strategy:
+  method: train_median_imputation
+  fit_scope: train_only
+  add_missing_indicators: true
+  indicator_suffix: _was_missing
+
+categorical_missing_strategy:
+  fill_value: __MISSING__
+  fit_scope: train_only
+
+unknown_category_strategy:
+  fill_value: __UNKNOWN__
+  apply_at_inference: true
+
+time_features:
+  source_column: TransactionDT
+  safe_features:
+    - transaction_day
+    - transaction_hour
+    - transaction_day_of_week
+    - time_since_previous_uid_transaction
+  excluded_features:
+    - uid_time_to_next
+  rules:
+    - use_prediction_time_available_information_only
+    - do_not_use_future_transactions
+
+uid_features:
+  identity_columns:
+    - card1
+    - addr1
+  derived_keys:
+    - uid_card1_addr1
+  helper_columns_excluded_from_model: true
+
+card_features:
+  source_columns:
+    - card1
+    - card2
+    - card3
+    - card4
+    - card5
+    - card6
+  derived_features:
+    - card_frequency_features
+    - card_amount_history_features
+
+address_features:
+  source_columns:
+    - addr1
+    - addr2
+  derived_features:
+    - address_frequency_features
+
+email_features:
+  source_columns:
+    - P_emaildomain
+    - R_emaildomain
+  derived_features:
+    - email_domain_frequency_features
+    - purchaser_recipient_email_match
+
+frequency_encoding:
+  enabled: true
+  fit_scope: train_only
+  columns:
+    - card1
+    - card2
+    - card3
+    - card4
+    - card5
+    - card6
+    - addr1
+    - addr2
+    - P_emaildomain
+    - R_emaildomain
+    - ProductCD
+  unknown_value: 0
+
+historical_aggregations:
+  enabled: true
+  fit_scope: train_only
+  require_past_data_only: true
+  group_keys:
+    - uid_card1_addr1
+    - card1
+    - addr1
+  amount_column: TransactionAmt
+  timestamp_column: TransactionDT
+  aggregations:
+    - count
+    - mean
+    - median
+    - std
+    - min
+    - max
+    - deviation_from_mean
+    - time_since_previous
+  excluded_aggregations:
+    - time_to_next
+
+categorical_encoding:
+  strategy: lightgbm_categorical_with_missing_unknown_buckets
+  fit_scope: train_only
+  missing_value: __MISSING__
+  unknown_value: __UNKNOWN__
+  high_cardinality_strategy: frequency_encoding
+
+split_strategy:
+  method: time_based
+  time_column: TransactionDT
+  fit_preprocessors_on: train
+  tune_threshold_on: validation
+  final_report_on: test
+  prevent_future_data_leakage: true
+
+model_strategy:
+  baseline_model: lightgbm_v1
+  first_v2_model: lightgbm
+  optional_later_comparisons:
+    - xgboost
+    - catboost
+  excluded_baselines:
+    - linear_regression
+  reason_linear_regression_excluded: fraud_detection_is_binary_classification
+
+future_v3_deep_learning:
+  enabled: false
+  status: planned_research_extension
+  candidate_models:
+    - mlp_tabular
+    - autoencoder_anomaly
+    - sequence_lstm_or_transformer
+    - tabtransformer_or_ft_transformer
+  prerequisites:
+    - stable_feature_engineering_v2
+    - completed_v1_vs_v2_comparison
+    - frozen_time_based_evaluation_split
+    - latency_benchmarking_available
+  promotion_rule:
+    - must outperform v1 and v2 on business-relevant fraud metrics
+    - must pass latency and deployment feasibility review
+
+evaluation_metrics:
+  - roc_auc
+  - pr_auc
+  - recall
+  - precision
+  - f1_score
+  - alert_rate
+  - confusion_matrix
+  - threshold
+  - latency_p50
+  - latency_p95
+  - latency_p99
+
+artifact_names:
+  model: model_artifacts/fraud_lgbm_v2.joblib
+  transformer: model_artifacts/feature_transformer_v2.joblib
+  feature_columns: model_artifacts/feature_columns_v2.json
+  metadata: model_artifacts/metadata_v2.json
+  threshold: model_artifacts/threshold_v2.json
+  run_manifest_pattern: artifacts/runs/training_v2_<timestamp>/manifest.json
+
+api_integration:
+  keep_predict_on_v1: true
+  planned_v2_route: /predict/v2
+  load_v2_artifacts_separately: true
+  explicit_model_version_selection: true
+  replace_v1_by_default: false
+
+tests_required:
+  - feature_contract_count_order_and_duplicates
+  - transformer_schema_matches_feature_columns_json
+  - model_feature_count_matches_contract
+  - artifact_loading
+  - prediction_shape_and_probability_range
+  - v1_predict_regression
+  - v2_api_route_after_integration
+  - v1_vs_v2_comparison_report
+  - leakage_guardrails
+  - benchmark_compatibility
