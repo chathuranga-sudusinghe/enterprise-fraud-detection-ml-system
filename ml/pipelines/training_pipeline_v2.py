@@ -9,7 +9,11 @@ from ml.training.feature_engineering_v2 import FeatureEngineeringV2
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+RAW_DATA_DIR = PROJECT_ROOT / "lakehouse" / "raw"
 ARTIFACT_DIR = PROJECT_ROOT / "model_artifacts"
+
+DEFAULT_TRANSACTION_PATH = RAW_DATA_DIR / "train_transaction.parquet"
+DEFAULT_IDENTITY_PATH = RAW_DATA_DIR / "train_identity.parquet"
 
 MODEL_V2_PATH = ARTIFACT_DIR / "fraud_lgbm_v2.joblib"
 TRANSFORMER_V2_PATH = ARTIFACT_DIR / "feature_transformer_v2.joblib"
@@ -38,6 +42,7 @@ TARGET_COLUMN = "isFraud"
 DEFAULT_TRAIN_RATIO = 0.70
 DEFAULT_VAL_RATIO = 0.15
 DEFAULT_TEST_RATIO = 0.15
+TRANSACTION_ID_COLUMN = "TransactionID"
 
 
 def load_full_dataset(dataset_path: str | Path) -> pd.DataFrame:
@@ -50,13 +55,57 @@ def load_full_dataset(dataset_path: str | Path) -> pd.DataFrame:
     suffix = path.suffix.lower()
     if suffix == ".parquet":
         return pd.read_parquet(path)
-    if suffix == ".csv":
+    elif suffix == ".csv":
         return pd.read_csv(path)
+    else:
+        raise ValueError(
+            f"Unsupported dataset file type for v2 training data: {suffix}. "
+            "Expected .parquet or .csv."
+        )
 
-    raise ValueError(
-        f"Unsupported dataset file type for v2 training data: {suffix}. "
-        "Expected .parquet or .csv."
-    )
+
+def load_transaction_identity_dataset(
+    transaction_path: str | Path = DEFAULT_TRANSACTION_PATH,
+    identity_path: str | Path = DEFAULT_IDENTITY_PATH,
+) -> pd.DataFrame:
+    """Load and left-merge IEEE transaction and identity training datasets."""
+
+    transaction_df = load_full_dataset(transaction_path)
+    identity_df = load_full_dataset(identity_path)
+    return merge_transaction_identity(transaction_df, identity_df)
+
+
+def merge_transaction_identity(
+    transaction_df: pd.DataFrame,
+    identity_df: pd.DataFrame,
+    *,
+    id_column: str = TRANSACTION_ID_COLUMN,
+    target_column: str = TARGET_COLUMN,
+) -> pd.DataFrame:
+    """
+    Left-merge transaction rows with optional identity/device attributes.
+
+    The transaction dataset is the row-preserving source of truth. Identity rows
+    enrich matching transactions when available and remain missing for
+    non-matching transaction IDs.
+    """
+
+    if id_column not in transaction_df.columns:
+        raise ValueError(
+            f"Missing merge key in transaction dataset: {id_column}"
+        )
+    if id_column not in identity_df.columns:
+        raise ValueError(f"Missing merge key in identity dataset: {id_column}")
+    if target_column not in transaction_df.columns:
+        raise ValueError(
+            f"Missing target column in transaction dataset: {target_column}"
+        )
+    if target_column in identity_df.columns:
+        raise ValueError(
+            f"Identity dataset must not contain target column: {target_column}"
+        )
+
+    return transaction_df.merge(identity_df, on=id_column, how="left")
 
 
 def validate_time_split_required_columns(
