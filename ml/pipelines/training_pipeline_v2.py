@@ -33,6 +33,143 @@ KNOWN_V1_ARTIFACT_NAMES = {
     "threshold_v1.json",
 }
 
+TIME_COLUMN = "TransactionDT"
+TARGET_COLUMN = "isFraud"
+DEFAULT_TRAIN_RATIO = 0.70
+DEFAULT_VAL_RATIO = 0.15
+DEFAULT_TEST_RATIO = 0.15
+
+
+def load_full_dataset(dataset_path: str | Path) -> pd.DataFrame:
+    """Load a full v2 training dataset from a supplied CSV or Parquet path."""
+
+    path = Path(dataset_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Dataset path does not exist: {path}")
+
+    suffix = path.suffix.lower()
+    if suffix == ".parquet":
+        return pd.read_parquet(path)
+    if suffix == ".csv":
+        return pd.read_csv(path)
+
+    raise ValueError(
+        f"Unsupported dataset file type for v2 training data: {suffix}. "
+        "Expected .parquet or .csv."
+    )
+
+
+def validate_time_split_required_columns(
+    df: pd.DataFrame,
+    *,
+    time_column: str = TIME_COLUMN,
+    target_column: str = TARGET_COLUMN,
+) -> None:
+    """Validate columns required for deterministic time-based v2 splitting."""
+
+    missing = [col for col in [time_column, target_column] if col not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required v2 split columns: {missing}")
+
+
+def sort_by_transaction_time(
+    df: pd.DataFrame,
+    *,
+    time_column: str = TIME_COLUMN,
+) -> pd.DataFrame:
+    """Return a stable TransactionDT-sorted copy without shuffling."""
+
+    if time_column not in df.columns:
+        raise ValueError(f"Missing required v2 split columns: ['{time_column}']")
+
+    return df.sort_values(time_column, kind="mergesort").reset_index(drop=True)
+
+
+def split_by_time_order(
+    df: pd.DataFrame,
+    *,
+    train_ratio: float = DEFAULT_TRAIN_RATIO,
+    val_ratio: float = DEFAULT_VAL_RATIO,
+    test_ratio: float = DEFAULT_TEST_RATIO,
+    time_column: str = TIME_COLUMN,
+    target_column: str = TARGET_COLUMN,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Split earliest rows to train, next rows to validation, latest rows to test."""
+
+    validate_time_split_required_columns(
+        df,
+        time_column=time_column,
+        target_column=target_column,
+    )
+    _validate_split_ratios(train_ratio, val_ratio, test_ratio)
+
+    sorted_df = sort_by_transaction_time(df, time_column=time_column)
+    row_count = len(sorted_df)
+    if row_count < 3:
+        raise ValueError("Time-based v2 split requires at least 3 rows.")
+
+    train_end = int(row_count * train_ratio)
+    val_end = train_end + int(row_count * val_ratio)
+
+    if train_end == 0 or val_end == train_end or val_end >= row_count:
+        raise ValueError(
+            "Time-based v2 split ratios produced an empty train, validation, "
+            "or test split."
+        )
+
+    train_df = sorted_df.iloc[:train_end].reset_index(drop=True)
+    val_df = sorted_df.iloc[train_end:val_end].reset_index(drop=True)
+    test_df = sorted_df.iloc[val_end:].reset_index(drop=True)
+    return train_df, val_df, test_df
+
+
+def separate_target(
+    df: pd.DataFrame,
+    *,
+    target_column: str = TARGET_COLUMN,
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Separate model features from the fraud target column."""
+
+    if target_column not in df.columns:
+        raise ValueError(f"Missing target column for v2 training: {target_column}")
+
+    X = df.drop(columns=[target_column])
+    y = df[target_column].copy()
+    return X, y
+
+
+def prepare_time_based_train_val_test_split(
+    df: pd.DataFrame,
+    *,
+    train_ratio: float = DEFAULT_TRAIN_RATIO,
+    val_ratio: float = DEFAULT_VAL_RATIO,
+    test_ratio: float = DEFAULT_TEST_RATIO,
+    time_column: str = TIME_COLUMN,
+    target_column: str = TARGET_COLUMN,
+) -> dict[str, pd.DataFrame | pd.Series]:
+    """Prepare X/y train, validation, and test splits for v2 dry-run/training."""
+
+    train_df, val_df, test_df = split_by_time_order(
+        df,
+        train_ratio=train_ratio,
+        val_ratio=val_ratio,
+        test_ratio=test_ratio,
+        time_column=time_column,
+        target_column=target_column,
+    )
+    X_train, y_train = separate_target(train_df, target_column=target_column)
+    X_val, y_val = separate_target(val_df, target_column=target_column)
+    X_test, y_test = separate_target(test_df, target_column=target_column)
+
+    return {
+        "X_train": X_train,
+        "y_train": y_train,
+        "X_val": X_val,
+        "y_val": y_val,
+        "X_test": X_test,
+        "y_test": y_test,
+    }
+
 
 def validate_v2_artifact_paths(artifact_paths: dict[str, Path]) -> None:
     """Prevent v2 pipeline code from targeting persisted v1 artifact files."""
@@ -105,3 +242,16 @@ def _validate_xy_lengths(X: pd.DataFrame, y: pd.Series, split_name: str) -> None
             f"X_{split_name} and y_{split_name} length mismatch: "
             f"{len(X)} != {len(y)}"
         )
+
+
+def _validate_split_ratios(
+    train_ratio: float,
+    val_ratio: float,
+    test_ratio: float,
+) -> None:
+    ratios = [train_ratio, val_ratio, test_ratio]
+    if any(ratio <= 0 for ratio in ratios):
+        raise ValueError("V2 split ratios must all be positive.")
+
+    if abs(sum(ratios) - 1.0) > 1e-9:
+        raise ValueError("V2 split ratios must sum to 1.0.")
