@@ -113,15 +113,13 @@ class FeatureEngineeringV2:
             for col in X_work.columns
             if col not in self.id_columns and col not in self.ignored_columns
         ]
+        self.categorical_columns_ = [
+            col for col in self.input_feature_columns_ if self._is_categorical_feature(col, X_work[col])
+        ]
         self.numerical_columns_ = [
             col
             for col in self.input_feature_columns_
-            if pd.api.types.is_numeric_dtype(X_work[col])
-        ]
-        self.categorical_columns_ = [
-            col
-            for col in self.input_feature_columns_
-            if col not in self.numerical_columns_
+            if col not in self.categorical_columns_
         ]
 
         for col in self.numerical_columns_:
@@ -205,32 +203,57 @@ class FeatureEngineeringV2:
         fitting: bool,
     ) -> pd.DataFrame:
         X = X.drop(columns=[*self.id_columns, *self.ignored_columns], errors="ignore")
+        derived_columns: dict[str, pd.Series] = {}
+
+        def add_or_replace_column(name: str, values: pd.Series) -> None:
+            if name in X.columns:
+                X[name] = values
+            else:
+                derived_columns[name] = values
 
         for col in self.numerical_columns_:
             if col not in X.columns:
-                X[col] = self.numerical_medians_[col]
-
-            numeric_values = pd.to_numeric(X[col], errors="coerce")
+                numeric_values = pd.Series(
+                    self.numerical_medians_[col],
+                    index=X.index,
+                    name=col,
+                )
+            else:
+                numeric_values = pd.to_numeric(X[col], errors="coerce")
             missing_indicator = numeric_values.isna().astype("int8")
-            X[col] = numeric_values.fillna(self.numerical_medians_[col])
+            filled_values = numeric_values.fillna(self.numerical_medians_[col])
+
+            add_or_replace_column(col, filled_values)
 
             if self.add_missing_indicators:
-                X[f"{col}{self.missing_indicator_suffix}"] = missing_indicator
+                add_or_replace_column(
+                    f"{col}{self.missing_indicator_suffix}",
+                    missing_indicator
+                )
 
         for col in self.categorical_columns_:
             if col not in X.columns:
-                X[col] = self.categorical_missing_value
-
-            values = X[col].where(X[col].notna(), self.categorical_missing_value)
+                values = pd.Series(
+                    self.categorical_missing_value,
+                    index=X.index,
+                    name=col,
+                )
+            else:
+                values = X[col].where(X[col].notna(), self.categorical_missing_value)
+            values = values.astype(str)
 
             if not fitting:
                 known_values = self.category_maps_.get(col, set())
                 values = values.where(values.isin(known_values), self.unknown_category_value)
 
-            X[col] = values.astype(str)
+            add_or_replace_column(col, values)
 
-        X["transaction_hour"] = (X["TransactionDT"] // 3600) % 24
-        X["transaction_day"] = X["TransactionDT"] // 86400
+        transaction_dt = X["TransactionDT"]
+        add_or_replace_column("transaction_hour", (transaction_dt // 3600) % 24)
+        add_or_replace_column("transaction_day", transaction_dt // 86400)
+
+        if derived_columns:
+            X = pd.concat([X, pd.DataFrame(derived_columns, index=X.index)], axis=1)
 
         # TODO: Add past-data-only historical aggregations after the v2 split
         # contract is implemented and tested. Future-looking features such as
@@ -267,3 +290,18 @@ class FeatureEngineeringV2:
         if X.columns.duplicated().any():
             duplicates = X.columns[X.columns.duplicated()].tolist()
             raise ValueError(f"Duplicate FeatureEngineeringV2 output columns: {duplicates}")
+
+    @staticmethod
+    def _is_identifier_like_column(col: str) -> bool:
+        return (
+            col.startswith("card")
+            or col.startswith("addr")
+            or col.startswith("id_")
+        )
+
+    def _is_categorical_feature(self, col: str, series: pd.Series) -> bool:
+        if self._is_identifier_like_column(col):
+            if col.startswith("id_"):
+                return series.nunique(dropna=True) <= 1000
+            return True
+        return not pd.api.types.is_numeric_dtype(series)

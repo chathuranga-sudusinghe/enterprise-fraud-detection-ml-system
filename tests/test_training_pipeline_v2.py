@@ -13,6 +13,7 @@ from ml.pipelines.training_pipeline_v2 import (
     load_transaction_identity_dataset,
     merge_transaction_identity,
     prepare_time_based_train_val_test_split,
+    run_training_pipeline_v2,
     run_training_pipeline_v2_dry_run,
     split_by_time_order,
     validate_v2_artifact_paths,
@@ -372,3 +373,153 @@ def test_load_full_dataset_supports_custom_parquet_path(tmp_path):
     loaded = load_full_dataset(parquet_path)
 
     assert loaded.equals(expected)
+
+
+class FakeModel:
+    best_iteration_ = 7
+
+    def predict_proba(self, X):
+        probabilities = [0.2, 0.8, 0.4][: len(X)]
+        return pd.DataFrame({0: [1 - p for p in probabilities], 1: probabilities}).to_numpy()
+
+
+def fake_train_lightgbm(
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    categorical_cols,
+):
+    assert "isFraud" not in X_train.columns
+    assert "TransactionID" not in X_train.columns
+    assert len(X_train) == 14
+    assert len(X_val) == 3
+    assert categorical_cols
+    for col in categorical_cols:
+        assert X_train[col].dtype.name == "category"
+        assert X_val[col].dtype.name == "category"
+        assert list(X_train[col].cat.categories) == list(X_val[col].cat.categories)
+    return FakeModel(), pd.Series([0.1, 0.9, 0.3])
+
+
+def install_training_monkeypatches(monkeypatch):
+    threshold_calls = []
+
+    monkeypatch.setattr(
+        training_pipeline_v2,
+        "load_transaction_identity_dataset",
+        lambda transaction_path=DEFAULT_TRANSACTION_PATH,
+        identity_path=DEFAULT_IDENTITY_PATH: make_unsorted_full_dataset(),
+    )
+    monkeypatch.setattr(training_pipeline_v2, "train_lightgbm", fake_train_lightgbm)
+
+    def fake_find_optimal_threshold(y_true, y_proba, target_recall=0.95):
+        threshold_calls.append(
+            {
+                "y_true": list(y_true),
+                "y_proba": list(y_proba),
+                "target_recall": target_recall,
+            }
+        )
+        return 0.5
+
+    monkeypatch.setattr(
+        training_pipeline_v2,
+        "find_optimal_threshold",
+        fake_find_optimal_threshold,
+    )
+    return threshold_calls
+
+
+def test_training_pipeline_v2_default_does_not_write_artifacts(monkeypatch):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    assert summary["would_write_artifacts"] is False
+    assert summary["artifacts_written"] is False
+
+
+def test_training_pipeline_v2_uses_v2_artifact_paths(monkeypatch):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    for path in summary["artifact_paths"].values():
+        assert "_v2" in Path(path).stem
+
+
+def test_training_pipeline_v2_rejects_v1_artifact_paths(monkeypatch):
+    install_training_monkeypatches(monkeypatch)
+    unsafe_paths = {
+        "model": Path("model_artifacts/fraud_lgbm_v1.joblib"),
+        **{name: path for name, path in V2_ARTIFACT_PATHS.items() if name != "model"},
+    }
+
+    with pytest.raises(ValueError, match="must not write or target v1 artifacts"):
+        run_training_pipeline_v2(artifact_paths=unsafe_paths)
+
+
+def test_training_pipeline_v2_uses_feature_engineering_v2(monkeypatch):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    assert summary["feature_engineering_version"] == "v2"
+    assert summary["transformer_class"] == "FeatureEngineeringV2"
+
+
+def test_training_pipeline_v2_threshold_uses_validation_predictions(monkeypatch):
+    threshold_calls = install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2(target_recall=0.9)
+
+    assert summary["threshold"] == 0.5
+    assert threshold_calls == [
+        {
+            "y_true": [1, 0, 1],
+            "y_proba": [0.1, 0.9, 0.3],
+            "target_recall": 0.9,
+        }
+    ]
+
+
+def test_training_pipeline_v2_summary_contains_validation_and_test_metrics(
+    monkeypatch,
+):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    for metrics_key in ["validation_metrics", "test_metrics"]:
+        metrics = summary[metrics_key]
+        assert "roc_auc" in metrics
+        assert "pr_auc" in metrics
+        assert "precision" in metrics
+        assert "recall" in metrics
+        assert "f1_score" in metrics
+        assert "alert_rate" in metrics
+        assert "confusion_matrix" in metrics
+        assert "threshold" in metrics
+    assert summary["feature_count"] == len(summary["feature_names"])
+    assert summary["categorical_feature_count"] > 0
+    assert summary["train_val_test_feature_columns_match"] is True
+
+
+def test_training_pipeline_v2_aligns_categorical_features_before_lightgbm(
+    monkeypatch,
+):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    assert summary["categorical_feature_count"] > 0
+
+
+def test_training_pipeline_v2_does_not_touch_predict(monkeypatch):
+    install_training_monkeypatches(monkeypatch)
+
+    summary = run_training_pipeline_v2()
+
+    assert "planned_v2_route" not in summary
+    assert all("/predict" not in path for path in summary["artifact_paths"].values())
