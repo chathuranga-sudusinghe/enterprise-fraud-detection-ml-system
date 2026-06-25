@@ -15,6 +15,7 @@ def make_training_frame() -> pd.DataFrame:
             "card3": [150.0, 150.0, 150.0],
             "card4": ["visa", None, "mastercard"],
             "addr1": [100.0, 100.0, 200.0],
+            "id_12": [1, 1, 2],
             "P_emaildomain": ["gmail.com", "yahoo.com", None],
             "isFraud": [0, 1, 0],
         }
@@ -137,12 +138,13 @@ def test_transform_uses_fit_time_medians_category_maps_and_frequency_maps():
         {
             "TransactionID": [4],
             "TransactionDT": [180000],
-            "TransactionAmt": [None],
+            "TransactionAmt": ["not-a-number"],
             "card1": [9999],
             "card2": [None],
             "card3": [150.0],
             "card4": ["discover"],
             "addr1": [999.0],
+            "id_12": [999],
             "P_emaildomain": ["new.example"],
             "isFraud": [1],
         }
@@ -151,8 +153,48 @@ def test_transform_uses_fit_time_medians_category_maps_and_frequency_maps():
     output = transformer.transform(new_data)
 
     assert output["TransactionAmt"].iloc[0] == 200.0
-    assert output["card2"].iloc[0] == 15.0
+    assert output["TransactionAmt_was_missing"].iloc[0] == 1
+    assert output["card2"].iloc[0] == "__MISSING__"
     assert output["card4"].iloc[0] == "__UNKNOWN__"
+    assert output["id_12"].iloc[0] == "__UNKNOWN__"
     assert output["P_emaildomain"].iloc[0] == "__UNKNOWN__"
     assert output["card1_frequency"].iloc[0] == 0
     assert output["addr1_frequency"].iloc[0] == 0
+
+
+def test_identifier_like_numeric_columns_are_categorical():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert {"card1", "card2", "card3", "addr1", "id_12"}.issubset(
+        set(transformer.categorical_columns_)
+    )
+    assert output["card1"].dtype == object
+    assert output["addr1"].dtype == object
+    assert output["id_12"].dtype == object
+
+
+def test_true_numeric_columns_remain_numeric():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert "TransactionAmt" in transformer.numerical_columns_
+    assert "TransactionDT" in transformer.numerical_columns_
+    assert pd.api.types.is_numeric_dtype(output["TransactionAmt"])
+
+
+def test_train_val_test_output_columns_remain_consistent():
+    transformer = FeatureEngineeringV2()
+    train = make_training_frame()
+    val = make_training_frame().copy()
+    test = make_training_frame().copy()
+    val["card1"] = [9999, 1111, 2222]
+    test["P_emaildomain"] = ["new.example", "gmail.com", None]
+
+    train_out = transformer.fit_transform(train)
+    val_out = transformer.transform(val)
+    test_out = transformer.transform(test)
+
+    assert list(train_out.columns) == list(val_out.columns) == list(test_out.columns)
