@@ -504,6 +504,10 @@ def test_training_pipeline_v2_summary_contains_validation_and_test_metrics(
     assert summary["feature_count"] == len(summary["feature_names"])
     assert summary["categorical_feature_count"] > 0
     assert summary["train_val_test_feature_columns_match"] is True
+    assert "threshold_selection" in summary
+    assert "recommended_threshold" in summary["threshold_selection"]
+    assert len(summary["validation_threshold_comparison"]) == 9
+    assert len(summary["test_threshold_comparison"]) == 9
 
 
 def test_training_pipeline_v2_aligns_categorical_features_before_lightgbm(

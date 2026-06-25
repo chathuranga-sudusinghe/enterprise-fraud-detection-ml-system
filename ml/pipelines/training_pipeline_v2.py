@@ -20,6 +20,8 @@ from sklearn.metrics import (
 from ml.training.feature_engineering_v2 import FeatureEngineeringV2
 from ml.training.train_lgbm import train_lightgbm
 from ml.utils.threshold import find_optimal_threshold
+from ml.utils.threshold_evaluation_v2 import evaluate_model_v2_thresholds
+from ml.utils.threshold_selection_v2 import select_model_v2_operating_threshold
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -364,6 +366,17 @@ def run_training_pipeline_v2(
         y_proba=test_proba,
         threshold=threshold,
     )
+    threshold_selection = select_model_v2_operating_threshold(
+        y_true=splits["y_val"],
+        y_proba=val_proba,
+    )
+    validation_threshold_comparison = threshold_selection[
+        "threshold_comparison"
+    ].to_dict(orient="records")
+    test_threshold_comparison = evaluate_model_v2_thresholds(
+        y_true=splits["y_test"],
+        y_proba=test_proba,
+    ).to_dict(orient="records")
 
     summary: dict[str, Any] = {
         "feature_engineering_version": "v2",
@@ -383,6 +396,15 @@ def run_training_pipeline_v2(
         "threshold": threshold,
         "validation_metrics": validation_metrics,
         "test_metrics": test_metrics,
+        "threshold_selection": {
+            "recommended_threshold": threshold_selection["recommended_threshold"],
+            "selection_rule": threshold_selection["selection_rule"],
+            "min_recall": threshold_selection["min_recall"],
+            "max_alert_rate": threshold_selection["max_alert_rate"],
+            "recommended_metrics": threshold_selection["recommended_metrics"],
+        },
+        "validation_threshold_comparison": validation_threshold_comparison,
+        "test_threshold_comparison": test_threshold_comparison,
         "artifact_paths": {
             name: str(path) for name, path in sorted(selected_artifact_paths.items())
         },
