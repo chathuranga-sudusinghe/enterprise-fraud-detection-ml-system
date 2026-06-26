@@ -14,9 +14,17 @@ def make_training_frame() -> pd.DataFrame:
             "card2": [10.0, 20.0, None],
             "card3": [150.0, 150.0, 150.0],
             "card4": ["visa", None, "mastercard"],
+            "card5": [226.0, 226.0, None],
+            "card6": ["debit", "credit", None],
             "addr1": [100.0, 100.0, 200.0],
+            "addr2": [87.0, 87.0, None],
             "id_12": [1, 1, 2],
+            "id_13": [None, 10, None],
             "P_emaildomain": ["gmail.com", "yahoo.com", None],
+            "R_emaildomain": [None, "gmail.com", None],
+            "ProductCD": ["W", "C", "W"],
+            "DeviceType": [None, "mobile", None],
+            "DeviceInfo": [None, "ios", "SM-G960U"],
             "isFraud": [0, 1, 0],
         }
     )
@@ -143,9 +151,17 @@ def test_transform_uses_fit_time_medians_category_maps_and_frequency_maps():
             "card2": [None],
             "card3": [150.0],
             "card4": ["discover"],
+            "card5": [999.0],
+            "card6": ["charge"],
             "addr1": [999.0],
+            "addr2": [999.0],
             "id_12": [999],
+            "id_13": [None],
             "P_emaildomain": ["new.example"],
+            "R_emaildomain": ["new.example"],
+            "ProductCD": ["S"],
+            "DeviceType": [None],
+            "DeviceInfo": ["new-device"],
             "isFraud": [1],
         }
     )
@@ -198,3 +214,85 @@ def test_train_val_test_output_columns_remain_consistent():
     test_out = transformer.transform(test)
 
     assert list(train_out.columns) == list(val_out.columns) == list(test_out.columns)
+
+
+def test_false_negative_driven_missing_flags_are_created():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert output["DeviceInfo_missing_flag"].tolist() == [1, 0, 0]
+    assert output["DeviceType_missing_flag"].tolist() == [1, 0, 1]
+    assert output["R_emaildomain_missing_flag"].tolist() == [1, 0, 1]
+    assert output["P_emaildomain_missing_flag"].tolist() == [0, 0, 1]
+
+
+def test_identity_missingness_features_are_created():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert output["identity_missing_count"].tolist() == [1, 0, 1]
+    assert output["identity_missing_ratio"].tolist() == [0.5, 0.0, 0.5]
+    assert output["high_identity_missing_flag"].tolist() == [0, 0, 0]
+
+
+def test_product_and_missingness_interaction_features_are_created():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert output["ProductCD_W_flag"].tolist() == [1, 0, 1]
+    assert output["ProductCD_DeviceType_missing_interaction"].tolist() == [
+        "W__DeviceType_missing_1",
+        "C__DeviceType_missing_0",
+        "W__DeviceType_missing_1",
+    ]
+    assert output["ProductCD_DeviceInfo_missing_interaction"].tolist() == [
+        "W__DeviceInfo_missing_1",
+        "C__DeviceInfo_missing_0",
+        "W__DeviceInfo_missing_0",
+    ]
+    assert output["ProductCD_R_emaildomain_missing_interaction"].tolist() == [
+        "W__R_emaildomain_missing_1",
+        "C__R_emaildomain_missing_0",
+        "W__R_emaildomain_missing_1",
+    ]
+
+
+def test_card_interaction_features_are_created():
+    transformer = FeatureEngineeringV2()
+
+    output = transformer.fit_transform(make_training_frame())
+
+    assert output["card3_addr2_interaction"].tolist() == [
+        "150.0__87.0",
+        "150.0__87.0",
+        "150.0____MISSING__",
+    ]
+    assert output["card4_card6_interaction"].tolist() == [
+        "visa__debit",
+        "__MISSING____credit",
+        "mastercard____MISSING__",
+    ]
+
+
+def test_false_negative_driven_interactions_are_categorical_and_unknown_mapped():
+    transformer = FeatureEngineeringV2()
+    transformer.fit(make_training_frame())
+    new_data = make_training_frame().iloc[[0]].copy()
+    new_data["ProductCD"] = "S"
+    new_data["DeviceType"] = None
+    new_data["DeviceInfo"] = None
+    new_data["R_emaildomain"] = None
+    new_data["card3"] = 999.0
+    new_data["addr2"] = 999.0
+    new_data["card4"] = "amex"
+    new_data["card6"] = "charge"
+
+    output = transformer.transform(new_data)
+
+    assert "card3_addr2_interaction" in transformer.categorical_columns_
+    assert output["ProductCD_DeviceType_missing_interaction"].iloc[0] == "__UNKNOWN__"
+    assert output["card3_addr2_interaction"].iloc[0] == "__UNKNOWN__"
+    assert output["card4_card6_interaction"].iloc[0] == "__UNKNOWN__"
