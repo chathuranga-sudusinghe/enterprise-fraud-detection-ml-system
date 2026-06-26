@@ -57,3 +57,4 @@ Thumbs.db
 .pytest_cache/
 # Runtime-generated API metrics
 artifacts/metrics/*.jsonl
+catboost_info/
