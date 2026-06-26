@@ -6,6 +6,25 @@ from typing import Any
 import pandas as pd
 
 
+FALSE_NEGATIVE_DRIVEN_NUMERIC_FEATURES = [
+    "DeviceInfo_missing_flag",
+    "DeviceType_missing_flag",
+    "R_emaildomain_missing_flag",
+    "P_emaildomain_missing_flag",
+    "identity_missing_count",
+    "identity_missing_ratio",
+    "high_identity_missing_flag",
+    "ProductCD_W_flag",
+]
+FALSE_NEGATIVE_DRIVEN_CATEGORICAL_FEATURES = [
+    "ProductCD_DeviceType_missing_interaction",
+    "ProductCD_DeviceInfo_missing_interaction",
+    "ProductCD_R_emaildomain_missing_interaction",
+    "card3_addr2_interaction",
+    "card4_card6_interaction",
+]
+
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "target_column": "isFraud",
     "id_columns": ["TransactionID"],
@@ -127,6 +146,9 @@ class FeatureEngineeringV2:
             self.numerical_medians_[col] = 0.0 if pd.isna(median) else float(median)
 
         prepared = self._prepare_base_columns(X_work, fitting=True)
+        for col in FALSE_NEGATIVE_DRIVEN_CATEGORICAL_FEATURES:
+            if col in prepared.columns and col not in self.categorical_columns_:
+                self.categorical_columns_.append(col)
 
         for col in self.categorical_columns_:
             values = set(prepared[col].dropna().unique().tolist())
@@ -251,9 +273,22 @@ class FeatureEngineeringV2:
         transaction_dt = X["TransactionDT"]
         add_or_replace_column("transaction_hour", (transaction_dt // 3600) % 24)
         add_or_replace_column("transaction_day", transaction_dt // 86400)
+        self._add_false_negative_driven_features(
+            X,
+            add_or_replace_column=add_or_replace_column,
+        )
 
         if derived_columns:
             X = pd.concat([X, pd.DataFrame(derived_columns, index=X.index)], axis=1)
+
+        if not fitting:
+            for col in FALSE_NEGATIVE_DRIVEN_CATEGORICAL_FEATURES:
+                if col in X.columns:
+                    known_values = self.category_maps_.get(col, set())
+                    X[col] = X[col].where(
+                        X[col].isin(known_values),
+                        self.unknown_category_value,
+                    )
 
         # TODO: Add past-data-only historical aggregations after the v2 split
         # contract is implemented and tested. Future-looking features such as
@@ -305,3 +340,89 @@ class FeatureEngineeringV2:
                 return series.nunique(dropna=True) <= 1000
             return True
         return not pd.api.types.is_numeric_dtype(series)
+
+    def _add_false_negative_driven_features(
+        self,
+        X: pd.DataFrame,
+        *,
+        add_or_replace_column,
+    ) -> None:
+        """Add deterministic signals found by Model v2 false-negative analysis."""
+
+        device_info_missing = self._missing_flag(X, "DeviceInfo")
+        device_type_missing = self._missing_flag(X, "DeviceType")
+        r_email_missing = self._missing_flag(X, "R_emaildomain")
+        p_email_missing = self._missing_flag(X, "P_emaildomain")
+        identity_missing_count, identity_missing_ratio = self._identity_missingness(X)
+        product_cd = self._safe_string_values(X, "ProductCD")
+
+        add_or_replace_column("DeviceInfo_missing_flag", device_info_missing)
+        add_or_replace_column("DeviceType_missing_flag", device_type_missing)
+        add_or_replace_column("R_emaildomain_missing_flag", r_email_missing)
+        add_or_replace_column("P_emaildomain_missing_flag", p_email_missing)
+        add_or_replace_column("identity_missing_count", identity_missing_count)
+        add_or_replace_column("identity_missing_ratio", identity_missing_ratio)
+        add_or_replace_column(
+            "high_identity_missing_flag",
+            (identity_missing_count >= 21).astype("int8"),
+        )
+        add_or_replace_column("ProductCD_W_flag", (product_cd == "W").astype("int8"))
+        add_or_replace_column(
+            "ProductCD_DeviceType_missing_interaction",
+            product_cd + "__DeviceType_missing_" + device_type_missing.astype(str),
+        )
+        add_or_replace_column(
+            "ProductCD_DeviceInfo_missing_interaction",
+            product_cd + "__DeviceInfo_missing_" + device_info_missing.astype(str),
+        )
+        add_or_replace_column(
+            "ProductCD_R_emaildomain_missing_interaction",
+            product_cd + "__R_emaildomain_missing_" + r_email_missing.astype(str),
+        )
+        add_or_replace_column(
+            "card3_addr2_interaction",
+            self._safe_string_values(X, "card3")
+            + "__"
+            + self._safe_string_values(X, "addr2"),
+        )
+        add_or_replace_column(
+            "card4_card6_interaction",
+            self._safe_string_values(X, "card4")
+            + "__"
+            + self._safe_string_values(X, "card6"),
+        )
+
+    def _missing_flag(self, X: pd.DataFrame, col: str) -> pd.Series:
+        if col not in X.columns:
+            return pd.Series(1, index=X.index, name=col, dtype="int8")
+        return (
+            X[col]
+            .isna()
+            .where(X[col] != self.categorical_missing_value, True)
+            .astype("int8")
+        )
+
+    def _identity_missingness(self, X: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
+        identity_columns = [col for col in X.columns if col.startswith("id_")]
+        if not identity_columns:
+            zeros = pd.Series(0, index=X.index, dtype="int16")
+            return zeros, zeros.astype(float)
+
+        missing_matrix = pd.DataFrame(
+            {
+                col: (
+                    X[col].isna()
+                    | (X[col].astype(str) == self.categorical_missing_value)
+                )
+                for col in identity_columns
+            },
+            index=X.index,
+        )
+        missing_count = missing_matrix.sum(axis=1).astype("int16")
+        missing_ratio = missing_count / len(identity_columns)
+        return missing_count, missing_ratio.astype(float)
+
+    def _safe_string_values(self, X: pd.DataFrame, col: str) -> pd.Series:
+        if col not in X.columns:
+            return pd.Series(self.categorical_missing_value, index=X.index, name=col)
+        return X[col].where(X[col].notna(), self.categorical_missing_value).astype(str)
