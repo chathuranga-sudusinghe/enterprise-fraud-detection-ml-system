@@ -18,7 +18,7 @@ from sklearn.metrics import (
 )
 
 from ml.training.feature_engineering_v2 import FeatureEngineeringV2
-from ml.training.train_lgbm import train_lightgbm
+from ml.training.train_lgbm_v2 import train_lightgbm_v2
 from ml.utils.threshold import find_optimal_threshold
 from ml.utils.threshold_evaluation_v2 import evaluate_model_v2_thresholds
 from ml.utils.threshold_selection_v2 import select_model_v2_operating_threshold
@@ -340,7 +340,7 @@ def run_training_pipeline_v2(
         X_test=X_test_v2,
         categorical_cols=categorical_cols,
     )
-    model, val_proba = train_lightgbm(
+    model, val_proba = train_lightgbm_v2(
         X_train=X_train_v2,
         y_train=splits["y_train"],
         X_val=X_val_v2,

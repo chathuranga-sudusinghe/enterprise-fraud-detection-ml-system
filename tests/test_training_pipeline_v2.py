@@ -383,7 +383,7 @@ class FakeModel:
         return pd.DataFrame({0: [1 - p for p in probabilities], 1: probabilities}).to_numpy()
 
 
-def fake_train_lightgbm(
+def fake_train_lightgbm_v2(
     X_train,
     y_train,
     X_val,
@@ -411,7 +411,7 @@ def install_training_monkeypatches(monkeypatch):
         lambda transaction_path=DEFAULT_TRANSACTION_PATH,
         identity_path=DEFAULT_IDENTITY_PATH: make_unsorted_full_dataset(),
     )
-    monkeypatch.setattr(training_pipeline_v2, "train_lightgbm", fake_train_lightgbm)
+    monkeypatch.setattr(training_pipeline_v2, "train_lightgbm_v2", fake_train_lightgbm_v2)
 
     def fake_find_optimal_threshold(y_true, y_proba, target_recall=0.95):
         threshold_calls.append(
