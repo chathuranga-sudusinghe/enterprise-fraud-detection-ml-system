@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 import pytest
 
@@ -216,6 +218,47 @@ def test_train_val_test_output_columns_remain_consistent():
     assert list(train_out.columns) == list(val_out.columns) == list(test_out.columns)
 
 
+def test_build_output_refactor_preserves_legacy_columns_values_and_frequency_order():
+    train = make_training_frame()
+    new_data = make_training_frame().copy()
+    new_data["card1"] = [9999, 1111, 2222]
+    new_data["P_emaildomain"] = ["new.example", "gmail.com", None]
+
+    legacy_transformer = LegacyBuildOutputFeatureEngineeringV2()
+    optimized_transformer = FeatureEngineeringV2()
+
+    legacy_train = legacy_transformer.fit_transform(train)
+    optimized_train = optimized_transformer.fit_transform(train)
+    legacy_new = legacy_transformer.transform(new_data)
+    optimized_new = optimized_transformer.transform(new_data)
+
+    assert legacy_transformer.feature_names_ == optimized_transformer.feature_names_
+    assert list(legacy_train.columns) == list(optimized_train.columns)
+    assert list(legacy_new.columns) == list(optimized_new.columns)
+    pd.testing.assert_frame_equal(legacy_train, optimized_train)
+    pd.testing.assert_frame_equal(legacy_new, optimized_new)
+    assert frequency_column_positions(legacy_train) == frequency_column_positions(
+        optimized_train
+    )
+
+
+def test_wide_frequency_output_does_not_emit_performance_warning():
+    transformer = FeatureEngineeringV2()
+    wide_frequency_columns = [f"freq_extra_{idx}" for idx in range(140)]
+    transformer.frequency_columns = [
+        *transformer.frequency_columns,
+        *wide_frequency_columns,
+    ]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", pd.errors.PerformanceWarning)
+        output = transformer.fit_transform(make_wide_frequency_frame(wide_frequency_columns))
+
+    assert output.columns.tolist() == transformer.feature_names_
+    assert "freq_extra_0_frequency" in output.columns
+    assert "freq_extra_139_frequency" in output.columns
+
+
 def test_false_negative_driven_missing_flags_are_created():
     transformer = FeatureEngineeringV2()
 
@@ -296,3 +339,45 @@ def test_false_negative_driven_interactions_are_categorical_and_unknown_mapped()
     assert output["ProductCD_DeviceType_missing_interaction"].iloc[0] == "__UNKNOWN__"
     assert output["card3_addr2_interaction"].iloc[0] == "__UNKNOWN__"
     assert output["card4_card6_interaction"].iloc[0] == "__UNKNOWN__"
+
+
+def make_wide_frequency_frame(extra_columns: list[str]) -> pd.DataFrame:
+    frame = make_training_frame()
+    extra_frame = pd.DataFrame(
+        {
+            col: [f"{col}_a", f"{col}_b", f"{col}_{idx}"]
+            for idx, col in enumerate(extra_columns)
+        },
+        index=frame.index,
+    )
+    return pd.concat([frame, extra_frame], axis=1)
+
+
+def frequency_column_positions(frame: pd.DataFrame) -> list[tuple[str, int]]:
+    return [
+        (column, idx)
+        for idx, column in enumerate(frame.columns)
+        if column.endswith("_frequency")
+    ]
+
+
+class LegacyBuildOutputFeatureEngineeringV2(FeatureEngineeringV2):
+    def _build_output(self, X: pd.DataFrame) -> pd.DataFrame:
+        model_columns = [
+            col
+            for col in X.columns
+            if col not in self.id_columns
+            and col not in self.ignored_columns
+            and col != "uid_time_to_next"
+        ]
+        output = X[model_columns].copy()
+
+        if self.frequency_enabled:
+            for col, freq_map in self.frequency_maps_.items():
+                if col in X.columns:
+                    output[f"{col}_frequency"] = (
+                        X[col].map(freq_map).fillna(self.frequency_unknown_value)
+                    )
+
+        self._ensure_no_duplicate_columns(output)
+        return output

@@ -307,11 +307,17 @@ class FeatureEngineeringV2:
         output = X[model_columns].copy()
 
         if self.frequency_enabled:
+            frequency_columns: dict[str, pd.Series] = {}
             for col, freq_map in self.frequency_maps_.items():
                 if col in X.columns:
-                    output[f"{col}_frequency"] = (
+                    frequency_columns[f"{col}_frequency"] = (
                         X[col].map(freq_map).fillna(self.frequency_unknown_value)
                     )
+            if frequency_columns:
+                output = pd.concat(
+                    [output, pd.DataFrame(frequency_columns, index=X.index)],
+                    axis=1,
+                )
 
         self._ensure_no_duplicate_columns(output)
         return output
