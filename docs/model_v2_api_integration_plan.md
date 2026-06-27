@@ -70,6 +70,8 @@ threshold_v2.json
 
 Before serving traffic, the artifact directory should pass the Model v2 reproducibility validation flow, including required file checks, feature count checks, threshold checks, metadata checks, evaluation report checks, and joblib load checks.
 
+The future API implementation branch should fail startup or disable `POST /predict/v2` if required v2 artifacts are missing or fail reproducibility validation.
+
 ## 6. Feature Transformation Plan
 
 Model v2 inference should use the serialized fitted transformer:
