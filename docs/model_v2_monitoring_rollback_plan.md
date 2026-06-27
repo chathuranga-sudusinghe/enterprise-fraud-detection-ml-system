@@ -125,7 +125,36 @@ Dashboard requirements:
 
 The dashboard should make it obvious whether a change affects only `/predict/v2` or also threatens v1 `/predict`.
 
-## 8. Rollback Triggers
+## 8. Fallback Behavior
+
+Fallback handles request-level or runtime failures during Model v2 serving. It is immediate runtime safety behavior for a single `/predict/v2` request or short-lived operation.
+
+Rollback is different. Rollback is an operational or release-level action used when Model v2 is repeatedly failing, unsafe, or unsuitable after deployment.
+
+Initial safe policy:
+
+```text
+/predict remains v1.
+/predict/v2 should fail closed on v2 validation or runtime failure.
+Silent v1 fallback from /predict/v2 is not allowed in the first implementation.
+```
+
+Fallback expectations:
+
+- If Model v2 artifacts are missing or fail startup validation, `/predict/v2` should not be enabled.
+- If a `/predict/v2` request fails because of feature validation, return a controlled validation error.
+- If Model v2 prediction fails unexpectedly, return a controlled runtime error.
+- Do not silently return a v1 prediction from `/predict/v2` unless an explicit fallback-to-v1 policy is reviewed and approved.
+
+If fallback-to-v1 is later allowed, the response must clearly include:
+
+- `fallback_used = true`
+- `fallback_model_version = "v1"`
+- `fallback_reason`
+
+Any fallback-to-v1 policy must be explicit, observable, tested, and reviewed before implementation because it changes the meaning of a `/predict/v2` response.
+
+## 9. Rollback Triggers
 
 Rollback or traffic blocking should be triggered by:
 
@@ -148,7 +177,7 @@ Examples:
 
 Rollback triggers should be documented in the deployment checklist before `/predict/v2` receives production traffic.
 
-## 9. Rollback Actions
+## 10. Rollback Actions
 
 Rollback should preserve the existing v1 path.
 
@@ -162,7 +191,7 @@ Actions:
 
 Rollback should not require changing v1 artifacts, modifying `/predict`, or changing normal runtime API behavior for existing v1 clients.
 
-## 10. Release And Deployment Checklist
+## 11. Release And Deployment Checklist
 
 Before enabling a future `/predict/v2` endpoint:
 
@@ -182,7 +211,7 @@ Before enabling a future `/predict/v2` endpoint:
 - Confirm rollback owner and rollback steps are documented.
 - Confirm `/predict/v2` can be disabled without affecting `/predict`.
 
-## 11. Explicit Non-Goals
+## 12. Explicit Non-Goals
 
 This branch is documentation-only.
 
