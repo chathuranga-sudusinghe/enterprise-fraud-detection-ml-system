@@ -1,8 +1,8 @@
 # Enterprise Fraud Detection ML System
 
-A production-oriented fraud detection ML system combining LightGBM model serving, FastAPI inference, a local lakehouse workflow, batch scoring, basic Kafka event processing, Airflow orchestration definitions, Docker packaging, CI validation, and AWS Terraform infrastructure scaffolding.
+A production-oriented fraud detection ML system combining LightGBM v1 serving through `POST /predict`, CatBoost Model v2 serving through `POST /predict/v2`, FastAPI inference, model-aware Prometheus monitoring, Grafana dashboard readiness, a local lakehouse workflow, batch scoring, basic Kafka event processing, Airflow orchestration definitions, Docker packaging, CI validation, and AWS Terraform infrastructure scaffolding.
 
-This repository is built as a serious AI/ML engineering project, not a notebook-only demo. It contains implemented model artifacts, API serving code, local data workflow components, orchestration definitions, monitoring hooks, and infrastructure code. It should not be described as production-ready or currently live on AWS without new validation evidence.
+This repository is built as a serious AI/ML engineering project, not a notebook-only demo. It contains implemented model artifacts, API serving code, local data workflow components, orchestration definitions, monitoring hooks, dashboard JSON, and infrastructure code. The Model v2 work has reached a controlled production-readiness checkpoint, but the system should not be described as currently live in public production or live on AWS without separate deployment validation evidence.
 
 ## Project overview
 
@@ -10,8 +10,13 @@ The project demonstrates how transaction fraud detection can be organized as an 
 
 - Local lakehouse-style data organization
 - Feature engineering for tabular transaction and identity data
-- LightGBM training and persisted artifact serving
-- FastAPI inference using the persisted model and transformer
+- LightGBM v1 inference on `POST /predict`
+- CatBoost Model v2 inference on `POST /predict/v2`
+- FastAPI inference using persisted models and transformers
+- Model v2 artifact validation and reproducibility checks
+- Model v2 GitHub Release asset strategy for large artifacts
+- Model-aware Prometheus metrics
+- Grafana dashboard JSON for Model v2 API monitoring
 - Batch scoring scripts for offline prediction
 - Basic Kafka consumer-to-API event processing
 - Airflow DAG definitions for batch scoring and retraining workflows
@@ -20,7 +25,7 @@ The project demonstrates how transaction fraud detection can be organized as an 
 - Terraform modules for AWS infrastructure scaffolding
 - Governance documentation and AI usage disclosure
 
-The current system is best described as production-oriented and portfolio-grade. Several components are implemented but not fully validated as production services.
+The current system is best described as production-oriented and portfolio-grade, with Model v2 ready for controlled rollout review. Several infrastructure components remain scaffolding or locally validated only, and AWS production deployment is not claimed.
 
 ## Business problem
 
@@ -41,19 +46,35 @@ Verified repository evidence shows:
 - LightGBM validation ROC-AUC is approximately `0.93` across historical baseline evidence.
 - The validation set contains `85,430` transactions.
 - The validation fraud count is `2,994`.
-- The runtime feature contract contains `445` features.
-- The active FastAPI serving path is verified as `api/main.py` -> `ml/inference/predict.py`.
-- Versioned model, transformer, feature columns, threshold, and metadata artifacts exist under `model_artifacts/`.
+- Model v1 `/predict` remains the unchanged LightGBM serving path.
+- Model v1 runtime feature contract contains `445` features.
+- Model v2 `/predict/v2` serves the validated CatBoost candidate.
+- Model v2 uses `FeatureEngineeringV2` with `831` transformed features.
+- Model v2 threshold is `0.10`.
+- The deep learning baseline was evaluated but did not beat the CatBoost Model v2 candidate.
+- PyTorch remains optional and is not required for normal CI or API serving.
+- Model v2 artifact reproducibility validation passed.
+- Model v2 artifacts are distributed as a GitHub Release bundle, not committed to Git.
+- API smoke testing passed for `GET /health`, `POST /predict`, and `POST /predict/v2`.
+- Monitoring smoke testing passed for model-aware Prometheus labels.
+- Full pytest passed with `176 passed`.
+- Versioned model, transformer, feature columns, threshold, and metadata artifacts exist for v1 locally; v2 large artifacts are expected from the release bundle.
 - Batch scoring has historical output and manifest evidence.
 - Basic Kafka-to-FastAPI scoring is implemented locally.
 
-The ROC-AUC values come from historical notebook, artifact, and manifest evidence. The official business threshold is not finalized.
+The v1 ROC-AUC values come from historical notebook, artifact, and manifest evidence. Model v2 readiness is based on the validated CatBoost promotion path, release artifact validation, API integration, smoke testing, monitoring, and dashboard readiness.
 
 ## Evidence and audit reports
 
 - [Current project repository audit](docs/reports/current_project_repository_audit.md)
 - [LightGBM baseline reconciliation](docs/reports/lightgbm_baseline_reconciliation.md)
 - [Repository architecture and capability audit](docs/reports/repository_architecture_and_capability_audit.md)
+- [Model v2 CatBoost artifact promotion plan](docs/model_v2_catboost_artifact_promotion_plan.md)
+- [Model v2 API integration plan](docs/model_v2_api_integration_plan.md)
+- [Model v2 monitoring and rollback plan](docs/model_v2_monitoring_rollback_plan.md)
+- [Model v2 API smoke test results](docs/model_v2_api_smoke_test_results.md)
+- [Model v2 monitoring smoke test results](docs/model_v2_monitoring_smoke_test_results.md)
+- [Model v2 production readiness report](docs/model_v2_production_readiness_report.md)
 
 ## Current project status
 
@@ -66,6 +87,12 @@ The ROC-AUC values come from historical notebook, artifact, and manifest evidenc
 | Runtime feature contract | Validated | 445 features in `feature_columns_v1.json` |
 | Runtime threshold | Implemented | Artifact fact: `0.008540712517184246` in `threshold_v1.json` |
 | Official business operating threshold | Planned | Notebook and persisted artifact use different threshold objectives; decision not finalized |
+| Model v2 `/predict/v2` endpoint | Implemented | `api/main.py` and `ml/inference/predict_v2.py` |
+| Model v2 CatBoost artifacts | Release asset, validated | Tag `model-v2-catboost-artifacts-2026-06-27`, asset `model_v2_catboost_artifacts.zip` |
+| Model v2 artifact validation | Passed | Reproducibility validation confirmed required files, 831 features, threshold `0.10`, metadata, and joblib loading |
+| Model-aware Prometheus metrics | Implemented | `api_requests_total` and `api_request_latency_seconds` labels distinguish endpoint, model version, family, and status |
+| Grafana dashboard JSON | Added and validated | `monitoring/grafana/dashboards/model_v2_api_dashboard.json` |
+| Controlled Model v2 production-readiness checkpoint | Completed | Release/tag `model-v2-production-ready-2026-06-27`; readiness report added |
 | Lakehouse workflow | Implemented | Local lakehouse directories and transformation scripts exist |
 | Batch scoring | Validated | Historical batch manifest and prediction parquet evidence exist |
 | Kafka event processing | Simulated | Basic local consumer posts Kafka messages to FastAPI |
@@ -83,10 +110,14 @@ The ROC-AUC values come from historical notebook, artifact, and manifest evidenc
 ```text
 Local data and artifacts
   -> lakehouse raw / external / processed / curated / splits
-  -> feature engineering and LightGBM training
+  -> feature engineering, LightGBM v1 training, and CatBoost Model v2 validation
   -> model_artifacts/*_v1
+  -> GitHub Release bundle for large Model v2 artifacts
   -> FastAPI runtime
-  -> /predict and /metrics
+  -> /predict v1 LightGBM
+  -> /predict/v2 v2 CatBoost
+  -> /metrics/ Prometheus metrics
+  -> Grafana dashboard JSON
 
 Batch path
   -> lakehouse/transformations/process_test_batch.py
@@ -109,28 +140,33 @@ Orchestration and deployment definitions
 flowchart LR
     A[Raw and External Data] --> B[Lakehouse Processing]
     B --> C[Feature Engineering]
-    C --> D[LightGBM Training]
+    C --> D[LightGBM v1 Training]
+    C --> E[CatBoost Model v2 Validation]
 
-    D --> E[Versioned Inference Artifacts<br/>Model + Transformer + Features + Threshold]
+    D --> F[Versioned v1 Artifacts<br/>LightGBM + Transformer + Features + Threshold]
+    E --> G[Validated v2 Release Bundle<br/>CatBoost + FeatureEngineeringV2 + 831 Features]
 
-    E --> F[FastAPI Prediction Service]
+    F --> H[FastAPI Prediction Service]
+    G --> H
 
-    G[Kafka Events] --> H[Kafka Consumer]
-    H --> F
+    I[Kafka Events] --> J[Kafka Consumer]
+    J --> H
 
-    F --> I[Transform Input Features]
-    I --> J[LightGBM Model Scoring]
-    J --> K[Threshold Decision]
-    K --> L[Predictions and Metrics]
+    H --> K["/predict v1 LightGBM"]
+    H --> L["/predict/v2 v2 CatBoost"]
+    K --> M[Predictions and Metrics]
+    L --> M
+    H --> N["/metrics/ Prometheus"]
+    N --> O[Grafana Dashboard JSON]
 
-    B --> M[Batch Scoring]
-    E --> M
-    M --> L
+    B --> P[Batch Scoring]
+    F --> P
+    P --> M
 ```
 
 ## Active runtime path
 
-The active API path is:
+The active v1 API path is:
 
 ```text
 uvicorn api.main:app
@@ -143,15 +179,33 @@ uvicorn api.main:app
   -> model_artifacts/threshold_v1.json
 ```
 
+The active v2 API path is:
+
+```text
+uvicorn api.main:app
+  -> api/main.py
+  -> FraudPredictorV2()
+  -> ml/inference/predict_v2.py
+  -> model_artifacts/fraud_catboost_v2.joblib
+  -> model_artifacts/feature_transformer_v2.joblib
+  -> model_artifacts/feature_columns_v2.json
+  -> model_artifacts/metadata_v2.json
+  -> model_artifacts/threshold_v2.json
+```
+
 Verified facts:
 
 - Active API entry point: `api/main.py`
-- Active inference implementation: `ml/inference/predict.py`
+- Active v1 inference implementation: `ml/inference/predict.py`
+- Active v2 inference implementation: `ml/inference/predict_v2.py`
 - Active artifacts directory: `model_artifacts/`
-- Active model artifact: `fraud_lgbm_v1.joblib`
-- Active transformer artifact: `feature_transformer_v1.joblib`
-- Active feature contract: `feature_columns_v1.json`
-- Active threshold file: `threshold_v1.json`
+- Active v1 model artifact: `fraud_lgbm_v1.joblib`
+- Active v1 transformer artifact: `feature_transformer_v1.joblib`
+- Active v1 feature contract: `feature_columns_v1.json`
+- Active v1 threshold file: `threshold_v1.json`
+- Model v2 artifacts are expected locally from the GitHub Release bundle, not committed to Git.
+- Model v2 release tag: `model-v2-catboost-artifacts-2026-06-27`
+- Model v2 artifact bundle: `model_v2_catboost_artifacts.zip`
 
 `api/inference.py` is not the active API path and is stale or broken because it expects `fraud_lgbm_v1.pkl`, while the tracked model artifact is `fraud_lgbm_v1.joblib`.
 
@@ -245,7 +299,7 @@ The project still needs an official baseline freeze that records dataset version
 
 ## Model artifacts and feature contract
 
-Active model artifacts:
+Active v1 model artifacts:
 
 ```text
 model_artifacts/
@@ -265,6 +319,37 @@ Verified artifact facts:
 - Stored metadata file: `metadata_v1.json`
 - Stored feature contract: `feature_columns_v1.json`
 
+Model v2 artifact strategy:
+
+```text
+GitHub Release
+  tag: model-v2-catboost-artifacts-2026-06-27
+  asset: model_v2_catboost_artifacts.zip
+```
+
+Expected local/server v2 artifact files after extracting the release bundle:
+
+```text
+model_artifacts/
+  fraud_catboost_v2.joblib
+  feature_transformer_v2.joblib
+  feature_columns_v2.json
+  metadata_v2.json
+  threshold_v2.json
+  model_v2_evaluation_report.json
+```
+
+Verified Model v2 artifact facts:
+
+- Model family: CatBoost
+- Feature engineering: `FeatureEngineeringV2`
+- Transformed feature count: `831`
+- Threshold: `0.10`
+- Artifact reproducibility validation: passed
+- Large v2 artifacts are intentionally not committed to Git
+- Deep learning baseline: evaluated, not selected
+- PyTorch requirement: optional only; not required for normal CI or API serving
+
 Reproducibility gaps:
 
 - Full split hashes are incomplete.
@@ -279,9 +364,10 @@ Implemented API endpoints in `api/main.py`:
 - `GET /`
 - `GET /health`
 - `POST /predict`
+- `POST /predict/v2`
 - `GET /metrics` through a mounted Prometheus ASGI app
 
-Prediction flow:
+v1 prediction flow:
 
 ```text
 POST /predict
@@ -300,8 +386,9 @@ Implemented:
 
 - FastAPI app
 - Health endpoint
-- Prediction endpoint
-- Prometheus request count and latency metrics
+- v1 prediction endpoint
+- v2 prediction endpoint
+- Prometheus request count and latency metrics with model-aware labels
 - File-based API metric logging through `artifacts/metrics/api_metrics.jsonl`
 
 Current limitations:
@@ -309,8 +396,48 @@ Current limitations:
 - Request schema is `data: dict`, not a strict transaction schema.
 - No authentication or authorization was found.
 - No readiness endpoint was found.
-- No model version is returned in the prediction response.
+- No model version is returned in the v1 `/predict` response by design; the v2 `/predict/v2` response includes model metadata.
 - No rate limiting or request-size controls were found.
+
+## Model v2 CatBoost endpoint
+
+Model v2 is served separately from v1.
+
+Endpoint:
+
+```text
+POST /predict/v2
+```
+
+Model v2 serving facts:
+
+| Item | Value |
+|---|---|
+| Model family | CatBoost |
+| Candidate | CatBoost default |
+| Feature engineering | `FeatureEngineeringV2` |
+| Feature count | `831` |
+| Threshold | `0.10` |
+| Artifact source | GitHub Release bundle, extracted locally/server-side |
+
+`POST /predict/v2` response fields:
+
+```text
+fraud_probability
+fraud_prediction
+threshold
+model_version
+model_family
+feature_count
+```
+
+Safety behavior:
+
+- `/predict` remains v1 and unchanged.
+- `/predict/v2` uses a separate `FraudPredictorV2` path.
+- `/predict/v2` validates v2 metadata, feature count, feature order, and transformed feature quality before scoring.
+- `/predict/v2` fails closed on v2 validation or runtime prediction failure.
+- Silent v1 fallback from `/predict/v2` is not part of the first implementation.
 
 ## Data lakehouse workflow
 
@@ -462,6 +589,7 @@ Important status:
 Tests found:
 
 - `tests/test_api.py`
+- `tests/test_grafana_dashboard.py`
 - `tests/test_data_pipeline.py`
 - `tests/test_inference.py`
 - `tests/test_model_artifacts.py`
@@ -478,33 +606,70 @@ CI workflow:
 Status:
 
 - Basic CI is implemented.
+- The completed Model v2 checkpoint reported full pytest passing with `176 passed`.
 - Full CI/CD is not implemented.
 - No deployment job was found.
 - No coverage gate, linting, type checking, security scan, Terraform validation, Kafka integration test, Airflow validation, or Docker Compose integration validation was found.
 
-Tests were not run during this README rebuild because the task explicitly prohibited running tests.
+Tests were not run during this README update because the task was documentation-only.
 
 ## Monitoring and observability
 
 Implemented monitoring and observability components:
 
 - Prometheus metrics mounted in `api/main.py`
-- Request counter and latency histogram in the API
+- Model-aware request counter and latency histogram in the API
 - File-based prediction metric logger in `artifacts/metrics/metrics_file_logger.py`
 - Existing `artifacts/metrics/api_metrics.jsonl`
 - Prometheus scrape config under `monitoring/prometheus/prometheus.yml`
+- Grafana dashboard JSON under `monitoring/grafana/dashboards/model_v2_api_dashboard.json`
 - PSI helper in `ml/monitoring/data_drift.py`
 - Model metric helper in `ml/monitoring/model_metrics.py`
 - Prediction distribution helper in `ml/monitoring/prediction_monitor.py`
 - Logging and tracing utility files under `observability/`
 
+Active Prometheus metrics:
+
+```text
+api_requests_total
+api_request_latency_seconds
+```
+
+Metric labels:
+
+```text
+endpoint
+model_version
+model_family
+status
+```
+
+Metrics endpoint note:
+
+- Direct Prometheus scrape path: `/metrics/`
+- `/metrics` redirects to `/metrics/`
+
+Grafana dashboard JSON:
+
+```text
+monitoring/grafana/dashboards/model_v2_api_dashboard.json
+```
+
+Dashboard panels include:
+
+- request rate
+- error rate
+- v1 vs v2 request volume
+- `/predict/v2` success/error split
+- latency p50/p95/p99
+
 Current limitations:
 
 - Drift and prediction monitoring helpers are not fully wired into the active runtime.
 - No alerting rules were found.
-- No dashboard provisioning evidence was found.
-- Grafana dashboard claims should not be made unless dashboards are added and validated.
-- Monitoring should be described as basic instrumentation and helper code, not production observability.
+- Grafana provisioning and Docker Compose monitoring integration may still need a separate branch.
+- Live alert thresholds need operational review.
+- Monitoring should be described as implemented API instrumentation and dashboard readiness, not proof of a live production monitoring stack.
 
 ## Agentic AI roadmap
 
@@ -564,6 +729,8 @@ enterprise-fraud-detection-ml-system/
     utils/
   model_artifacts/
   monitoring/
+    grafana/
+      dashboards/
     prometheus/
   notebooks/
   observability/
@@ -582,15 +749,20 @@ enterprise-fraud-detection-ml-system/
 
 ## Known limitations
 
-- The official LightGBM baseline and business operating threshold are not finalized.
+- The official v1 LightGBM baseline and business operating threshold are not finalized.
 - The notebook `0.05` threshold and persisted `0.008540712517184246` threshold use different objectives.
 - The full time-based split generation process is not tracked as a reproducible script.
 - Current feature-engineering source may not reproduce every persisted feature in the runtime transformer.
+- `FeatureEngineeringV2` emits a pandas DataFrame fragmentation `PerformanceWarning` during transformation; it is non-blocking and should be handled in a future optimization branch.
 - `api/inference.py` is stale or broken.
 - Retraining Airflow DAG references missing registry functionality.
 - Kafka integration is basic/local and lacks production reliability components.
 - Terraform deployment status is unvalidated.
+- AWS deployment remains unvalidated and is not claimed as live.
 - CI validates tests and Docker build, not deployment.
+- Grafana dashboard JSON is validated, but provisioning and Docker Compose monitoring integration may still need a separate branch.
+- Live alert thresholds need operational review.
+- Sustained production traffic still requires controlled rollout review.
 - Agentic AI and selective inference are planned only.
 
 ## Capability status matrix
@@ -603,6 +775,12 @@ enterprise-fraud-detection-ml-system/
 | Persisted feature transformer | Implemented | `model_artifacts/feature_transformer_v1.joblib` |
 | Runtime feature contract | Validated | 445 features in `feature_columns_v1.json` |
 | Runtime threshold loading | Implemented | `threshold_v1.json` |
+| Model v2 `/predict/v2` | Implemented | `api/main.py` and `ml/inference/predict_v2.py` |
+| Model v2 CatBoost artifacts | Validated release asset | `model-v2-catboost-artifacts-2026-06-27` / `model_v2_catboost_artifacts.zip` |
+| Model v2 artifact reproducibility | Passed | Validated required files, 831 features, threshold `0.10`, metadata, and joblib loading |
+| Model v2 monitoring metrics | Implemented | `api_requests_total` and `api_request_latency_seconds` with model-aware labels |
+| Grafana dashboard JSON | Validated | `monitoring/grafana/dashboards/model_v2_api_dashboard.json` |
+| Controlled production-readiness checkpoint | Completed | `model-v2-production-ready-2026-06-27` |
 | Official business threshold | Planned | Requires baseline freeze |
 | LightGBM baseline comparison | Validated | Notebook outputs, persisted artifacts, and training manifest |
 | Training pipeline | Implemented | `ml/pipelines/training_pipeline.py` |
@@ -618,6 +796,7 @@ enterprise-fraud-detection-ml-system/
 | GitHub Actions CI | Implemented | Test and Docker build workflow |
 | Full CD | Unsupported | No deployment workflow |
 | Prometheus API metrics | Implemented | `/metrics` in `api/main.py` |
+| Model-aware monitoring labels | Implemented | `endpoint`, `model_version`, `model_family`, `status` |
 | Drift monitoring | Planned | PSI helper exists but is not fully wired |
 | Model registry | Unsupported | Empty registry files and missing registration script |
 | Agentic AI | Planned | No runtime evidence |
@@ -652,18 +831,21 @@ See [AI_USAGE.md](AI_USAGE.md) for the full disclosure.
 
 Recommended next steps:
 
-1. Freeze the official LightGBM baseline and business operating threshold.
-2. Add a reproducible split-generation script and dataset source manifest.
-3. Record full hashes for splits, model, transformer, feature columns, threshold, metadata, and validation predictions.
-4. Reconcile current feature-engineering source with the persisted 445-feature runtime contract.
-5. Repair or remove stale duplicate inference paths.
-6. Add strict FastAPI request and response schemas.
-7. Add non-mutating artifact and schema validation tests.
-8. Fix or mark the retraining Airflow DAG as prototype until registry functionality exists.
-9. Strengthen Kafka with schema validation, result topic, dead-letter handling, and integration tests.
-10. Add Terraform validation before making deployment claims.
-11. Add authentication, readiness checks, and operational monitoring before public deployment.
-12. Evaluate agentic AI and selective inference only after the baseline, threshold, and artifact contract are stable.
+1. Run a controlled Model v2 rollout review.
+2. Validate `/predict/v2`, artifacts, metrics, and dashboard behavior in the target environment.
+3. Add Grafana provisioning and Docker Compose monitoring integration if local monitoring stack startup should be one command.
+4. Add alert rules for error rate, latency, and alert-rate drift.
+5. Optimize `FeatureEngineeringV2` to address the pandas DataFrame fragmentation warning.
+6. Add stronger FastAPI request schemas, authentication, and readiness checks if needed before wider exposure.
+7. Freeze the official v1 LightGBM baseline and business operating threshold for historical governance.
+8. Add a reproducible split-generation script and dataset source manifest.
+9. Record full hashes for splits, model, transformer, feature columns, threshold, metadata, and validation predictions.
+10. Reconcile current v1 feature-engineering source with the persisted 445-feature runtime contract.
+11. Repair or remove stale duplicate inference paths.
+12. Fix or mark the retraining Airflow DAG as prototype until registry functionality exists.
+13. Strengthen Kafka with schema validation, result topic, dead-letter handling, and integration tests.
+14. Add Terraform validation before making deployment claims.
+15. Evaluate agentic AI and selective inference only after serving, monitoring, and governance contracts are stable.
 
 ## Author and license
 
