@@ -58,3 +58,9 @@ Thumbs.db
 # Runtime-generated API metrics
 artifacts/metrics/*.jsonl
 catboost_info/
+
+# Model v2 generated artifacts - stored as GitHub Release assets
+model_artifacts/*_v2.json
+model_artifacts/*_v2.joblib
+model_artifacts/model_v2_evaluation_report.json
+model_artifacts/model_v2_catboost_artifacts.zip
