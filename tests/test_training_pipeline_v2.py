@@ -145,8 +145,24 @@ def test_safety_guard_rejects_v1_artifact_names():
         validate_v2_artifact_paths(unsafe_paths)
 
 
-def test_dry_run_does_not_write_artifact_files():
-    summary = run_dry_run()
+def test_dry_run_does_not_write_artifact_files(tmp_path):
+    artifact_paths = {
+        "model": tmp_path / "fraud_lgbm_v2.joblib",
+        "transformer": tmp_path / "feature_transformer_v2.joblib",
+        "feature_columns": tmp_path / "feature_columns_v2.json",
+        "metadata": tmp_path / "metadata_v2.json",
+        "threshold": tmp_path / "threshold_v2.json",
+    }
+
+    summary = run_training_pipeline_v2_dry_run(
+        X_train=make_frame(),
+        y_train=make_target(),
+        X_val=make_frame(offset=10),
+        y_val=make_target(),
+        X_test=make_frame(offset=20),
+        y_test=make_target(),
+        artifact_paths=artifact_paths,
+    )
 
     assert summary["would_write_artifacts"] is False
     for path in summary["artifact_paths"].values():
