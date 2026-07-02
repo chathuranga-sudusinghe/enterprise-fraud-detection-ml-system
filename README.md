@@ -55,6 +55,8 @@ Verified repository evidence shows:
 - PyTorch remains optional and is not required for normal CI or API serving.
 - Model v2 artifact reproducibility validation passed.
 - Model v2 artifacts are distributed as a GitHub Release bundle, not committed to Git.
+- Model v2 was submitted to the IEEE-CIS Fraud Detection Kaggle competition as a late-submission benchmark.
+- The late-submission benchmark achieved Public ROC-AUC `0.906500` and Private ROC-AUC `0.879907`.
 - API smoke testing passed for `GET /health`, `POST /predict`, and `POST /predict/v2`.
 - Monitoring smoke testing passed for model-aware Prometheus labels.
 - Full pytest passed with `176 passed`.
@@ -63,6 +65,27 @@ Verified repository evidence shows:
 - Basic Kafka-to-FastAPI scoring is implemented locally.
 
 The v1 ROC-AUC values come from historical notebook, artifact, and manifest evidence. Model v2 readiness is based on the validated CatBoost promotion path, release artifact validation, API integration, smoke testing, monitoring, and dashboard readiness.
+
+## Kaggle late-submission benchmark
+
+The completed Enterprise Fraud Detection ML System V2 CatBoost model was submitted to the IEEE-CIS Fraud Detection Kaggle competition as a late-submission benchmark. The objective was to reuse the completed local ML system, generate a valid Kaggle `submission.csv`, and record the score as an external benchmark. This was not a prize competition attempt.
+
+| Item | Value |
+|---|---|
+| Competition | IEEE-CIS Fraud Detection |
+| Kaggle notebook | IEEE-CIS Fraud Detection - Enterprise Fraud V2 |
+| Model | Enterprise Fraud V2 CatBoost |
+| Feature engineering | `FeatureEngineeringV2` |
+| Transformed feature count | `831` |
+| Public ROC-AUC | `0.906500` |
+| Private ROC-AUC | `0.879907` |
+| Submission type | Late submission |
+| Kaggle status | Complete after deadline |
+| Purpose | External learning and benchmark checkpoint, not a prize attempt |
+
+![Kaggle Submission Score](docs/reports/ieee-cis-fraud-detection-submission-score.png)
+
+![Kaggle Notebook Score](docs/reports/ieee-cis-fraud-detection-notebook-score.png)
 
 ## Evidence and audit reports
 
