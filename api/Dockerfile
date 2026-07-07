@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -11,8 +11,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY api /app/api
 COPY ml /app/ml
-COPY artifacts /app/artifacts
-COPY model_artifacts /app/model_artifacts
+COPY artifacts/metrics /app/artifacts/metrics
 
 EXPOSE 8000
 
