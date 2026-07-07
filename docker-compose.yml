@@ -1,130 +1,59 @@
-services:
-
-  # ------------------------------------------------------------
-  # Kafka broker service
-  # Runs Apache Kafka in KRaft mode (no Zookeeper required)
-  # ------------------------------------------------------------
+﻿services:
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    container_name: kafka
+    container_name: fraud-kafka
     hostname: kafka
-
-    # Expose Kafka broker port to host machine
     ports:
       - "9092:9092"
-
+      - "29092:29092"
     environment:
-
-      # ------------------------------------------------------------
-      # KRaft Mode Configuration
-      # Kafka runs without ZooKeeper using its internal Raft protocol
-      # ------------------------------------------------------------
-
-      # Unique ID of this Kafka node
       KAFKA_NODE_ID: "1"
-
-      # This node acts as both broker and controller
       KAFKA_PROCESS_ROLES: "broker,controller"
-
-      # Controller quorum configuration
-      # Format: {node_id}@{hostname}:{controller_port}
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-
-      # ------------------------------------------------------------
-      # Kafka Cluster ID
-      # Must be generated once using:
-      # docker run --rm confluentinc/cp-kafka:7.6.1 kafka-storage random-uuid
-      # ------------------------------------------------------------
       CLUSTER_ID: "V7zF9dV9TzKzY2xw1h6m3Q"
-
-      # ------------------------------------------------------------
-      # Listener Configuration
-      # Defines how clients connect to Kafka
-      # ------------------------------------------------------------
-
-      # Security protocol mapping for listeners
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
-
-      # Kafka listens on these addresses
-      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
-
-      # Address advertised to other services in Docker network
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
-
-      # Listener used for broker-to-broker communication
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-
-      # Controller listener name
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
-
-      # ------------------------------------------------------------
-      # Kafka Internal Topics Configuration
-      # Required when running single-node Kafka cluster
-      # ------------------------------------------------------------
-
-      # Replication factor for offsets topic
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
-
-      # Replication factor for transaction logs
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
-
-      # Minimum in-sync replicas
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
-
-      # Startup delay for consumer group rebalancing
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
-
-    # ------------------------------------------------------------
-    # Persistent storage for Kafka logs and topics
-    # ------------------------------------------------------------
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     volumes:
       - kafka_data:/var/lib/kafka/data
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: fraud-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "local"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:9092"
+    depends_on:
+      - kafka
 
-  # ------------------------------------------------------------
-  # FastAPI service (model inference API)
-  # ------------------------------------------------------------
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
-    container_name: api
-
-    # Expose API endpoint
+    container_name: fraud-api
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
-
-    # API starts after Kafka is ready
-    depends_on:
-      - kafka
-
-
-  # ------------------------------------------------------------
-  # Kafka Consumer Service
-  # Reads streaming transactions from Kafka
-  # Sends prediction request to FastAPI model API
-  # ------------------------------------------------------------
-  consumer:
-    build:
-      context: .
-      dockerfile: api/streaming/Dockerfile
-    container_name: consumer
-
     environment:
-
-      # Kafka bootstrap server
-      KAFKA_BOOTSTRAP: "kafka:9092"
-
-      # FastAPI prediction endpoint
-      API_URL: "http://api:8000/predict"
-
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./model_artifacts:/app/model_artifacts:ro
+      - ./artifacts:/app/artifacts
     depends_on:
       - kafka
-      - api
 
+  # Future Airflow services placeholder only.
+  # Add airflow-postgres, airflow-webserver, and airflow-scheduler here
+  # later after Airflow runtime requirements are reviewed.
 
-# ------------------------------------------------------------
-# Named volume for Kafka persistent storage
-# ------------------------------------------------------------
 volumes:
   kafka_data:

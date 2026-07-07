@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -11,9 +11,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY api /app/api
 COPY ml /app/ml
-COPY artifacts /app/artifacts
-COPY model_artifacts /app/model_artifacts
 
 EXPOSE 8000
 
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

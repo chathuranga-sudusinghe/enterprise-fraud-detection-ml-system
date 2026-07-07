@@ -1,4 +1,4 @@
-name: ML System CI Pipeline
+﻿name: ML System CI Pipeline
 
 # Trigger pipeline on push or pull request to main and dev branches
 on:
@@ -50,7 +50,7 @@ jobs:
 
           while IFS= read -r file; do
             case "$file" in
-              api/*|ml/*|tests/*|scripts/*|lakehouse/*|orchestration/*|terraform/*|docker/*|Dockerfile|docker-compose.yml|requirements*.txt|pytest.ini|.github/workflows/*)
+              api/*|ml/*|tests/*|scripts/*|lakehouse/*|orchestration/*|terraform/*|docker-compose.yml|requirements*.txt|pytest.ini|.github/workflows/*)
                 run_heavy=true
                 ;;
               README.md|*.md|docs/*)
@@ -105,4 +105,6 @@ jobs:
       - name: Build docker
         if: steps.scope.outputs.run_heavy == 'true'
         run: |
-          docker build -t enterprise-ml-system -f docker/Dockerfile .
+          docker build -t enterprise-ml-system -f api/Dockerfile .
+
+

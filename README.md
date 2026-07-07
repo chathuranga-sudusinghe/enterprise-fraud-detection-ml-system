@@ -1,4 +1,4 @@
-# Enterprise Fraud Detection ML System
+﻿# Enterprise Fraud Detection ML System
 
 A production-oriented fraud detection ML system combining LightGBM v1 serving through `POST /predict`, CatBoost Model v2 serving through `POST /predict/v2`, FastAPI inference, model-aware Prometheus monitoring, Grafana dashboard readiness, a local lakehouse workflow, batch scoring, basic Kafka event processing, Airflow orchestration definitions, Docker packaging, CI validation, and AWS Terraform infrastructure scaffolding.
 
@@ -412,7 +412,7 @@ Implemented:
 - v1 prediction endpoint
 - v2 prediction endpoint
 - Prometheus request count and latency metrics with model-aware labels
-- File-based API metric logging through `artifacts/metrics/api_metrics.jsonl`
+- File-based API metric output through `artifacts/metrics/api_metrics.jsonl`
 
 Current limitations:
 
@@ -546,7 +546,6 @@ Implemented:
 
 - `orchestration/airflow/dags/batch_scoring_dag.py`
 - `orchestration/airflow/dags/retrain_pipeline.py`
-- `orchestration/airflow/docker-compose.airflow.yml`
 
 Status by DAG:
 
@@ -562,9 +561,8 @@ The Airflow files should be described as orchestration definitions, not as a val
 Docker files:
 
 - `api/Dockerfile`: API image used by root `docker-compose.yml`
-- `docker/Dockerfile`: image built by GitHub Actions
 - `api/streaming/Dockerfile`: streaming consumer image
-- `docker-compose.yml`: local Kafka, API, and consumer stack
+- `docker-compose.yml`: local API, Kafka, and Kafka UI stack
 
 Local development requirements:
 
@@ -624,7 +622,7 @@ CI workflow:
 - Runs on push and pull requests to `main`
 - Installs `requirements.txt`
 - Runs `python -m pytest tests/`
-- Builds a Docker image from `docker/Dockerfile`
+- Builds a Docker image from `api/Dockerfile`
 
 Status:
 
@@ -642,14 +640,14 @@ Implemented monitoring and observability components:
 
 - Prometheus metrics mounted in `api/main.py`
 - Model-aware request counter and latency histogram in the API
-- File-based prediction metric logger in `artifacts/metrics/metrics_file_logger.py`
+- File-based prediction metric logger in `ml/monitoring/metrics_file_logger.py`
 - Existing `artifacts/metrics/api_metrics.jsonl`
 - Prometheus scrape config under `monitoring/prometheus/prometheus.yml`
 - Grafana dashboard JSON under `monitoring/grafana/dashboards/model_v2_api_dashboard.json`
 - PSI helper in `ml/monitoring/data_drift.py`
 - Model metric helper in `ml/monitoring/model_metrics.py`
 - Prediction distribution helper in `ml/monitoring/prediction_monitor.py`
-- Logging and tracing utility files under `observability/`
+- Monitoring, logging, tracing, and file metric utilities under `ml/monitoring/`
 
 Active Prometheus metrics:
 
@@ -743,6 +741,7 @@ enterprise-fraud-detection-ml-system/
     splits/
     transformations/
   ml/
+    agents/
     explainability/
     inference/
     monitoring/
@@ -756,7 +755,6 @@ enterprise-fraud-detection-ml-system/
       dashboards/
     prometheus/
   notebooks/
-  observability/
   orchestration/
     airflow/
   scripts/
@@ -764,6 +762,7 @@ enterprise-fraud-detection-ml-system/
     environments/dev/
     modules/
   tests/
+    benchmarks/
   docker-compose.yml
   requirements.txt
   requirements_full.txt
@@ -881,3 +880,5 @@ LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe
 GitHub: https://github.com/chathuranga-sudusinghe
 
 This project is licensed under the terms in [LICENSE](LICENSE).
+
+
