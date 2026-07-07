@@ -1,4 +1,4 @@
-# API Latency Baseline Benchmark
+﻿# API Latency Baseline Benchmark
 
 This directory contains non-production benchmark tooling for the current fraud
 prediction API. The harness measures the system as it works now; it does not
@@ -43,13 +43,13 @@ Use `--no-output` to print results without writing a result file, or pass
 ## Safe Validation Run
 
 ```bash
-python benchmarks/api_latency_baseline.py --preset safe --no-output
+python tests/benchmarks/api_latency_baseline.py --preset safe --no-output
 ```
 
 ## Full Baseline Run
 
 ```bash
-python benchmarks/api_latency_baseline.py --preset full
+python tests/benchmarks/api_latency_baseline.py --preset full
 ```
 
 The full preset runs concurrency levels `1, 5, 10, 25, 50`, with warm-up
@@ -61,8 +61,9 @@ By default, the benchmark uses FastAPI `TestClient` in-process. To measure a
 running API over HTTP, start the API separately and pass:
 
 ```bash
-python benchmarks/api_latency_baseline.py --url http://127.0.0.1:8000 --preset full
+python tests/benchmarks/api_latency_baseline.py --url http://127.0.0.1:8000 --preset full
 ```
 
 Kafka is not called by the current `/predict` path and is not started by this
 benchmark.
+
