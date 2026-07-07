@@ -2,54 +2,59 @@
 
 ## Overview
 
-The Fraud Detection API provides a REST interface for accessing the trained fraud detection model.
+The Fraud Detection API provides a FastAPI REST interface for fraud prediction.
 
-The API is built using **FastAPI** and serves real-time fraud predictions.
+The current API serves:
 
----
+- Model v1 LightGBM predictions through `POST /predict`
+- Model v2 CatBoost predictions through `POST /predict/v2`
+- Prometheus-compatible metrics through `GET /metrics/`
 
 ## Base URL
 
-http://127.0.0.1:8000
-
----
+```text
+http://localhost:8000
+```
 
 ## Endpoints
 
-### Root Endpoint
+### GET /
 
-GET /
+Root health-style message for the API service.
 
 Response:
 
+```json
 {
   "message": "Fraud API is running"
 }
+```
 
----
+### GET /health
 
-### Health Check
-
-GET /health
+Health check endpoint.
 
 Response:
 
+```json
 {
   "status": "healthy"
 }
+```
 
----
+### POST /predict
 
-### Fraud Prediction
+Model v1 fraud prediction endpoint.
 
-POST /predict
+Model family: LightGBM
 
 Request body:
 
+```json
 {
   "data": {
-    "TransactionID": 86400,
-    "TransactionAmt": 100,
+    "TransactionDT": 86400,
+    "TransactionAmt": 100.0,
     "card1": 1234,
     "card2": 111,
     "card3": 150,
@@ -57,39 +62,112 @@ Request body:
     "addr1": 315
   }
 }
+```
 
-Response:
+Response fields:
 
+- `fraud_probability`
+- `fraud_prediction`
+
+Example response:
+
+```json
 {
   "fraud_probability": 0.1641,
   "fraud_prediction": 1
 }
+```
 
----
+Error response:
 
-## Monitoring
+```json
+{
+  "detail": "Prediction error"
+}
+```
 
-The API exposes monitoring metrics through:
+### POST /predict/v2
 
-GET /metrics
+Model v2 fraud prediction endpoint.
 
-This endpoint provides **Prometheus-compatible metrics** including:
+Model family: CatBoost
 
-- API request count
-- API latency
-- system metrics
+Request body:
 
----
+```json
+{
+  "data": {
+    "TransactionDT": 86400,
+    "TransactionAmt": 100.0,
+    "card1": 1234,
+    "card2": 111,
+    "card3": 150,
+    "card4": "visa",
+    "addr1": 315
+  }
+}
+```
+
+Response fields:
+
+- `fraud_probability`
+- `fraud_prediction`
+- `threshold`
+- `model_version`
+- `model_family`
+- `feature_count`
+
+Example response:
+
+```json
+{
+  "fraud_probability": 0.039,
+  "fraud_prediction": 0,
+  "threshold": 0.1,
+  "model_version": "v2",
+  "model_family": "catboost",
+  "feature_count": 831
+}
+```
+
+Error response:
+
+```json
+{
+  "detail": "Model v2 prediction error"
+}
+```
+
+### GET /metrics/
+
+Prometheus-compatible metrics endpoint.
+
+Useful API metrics include:
+
+- `api_requests_total`
+- `api_request_latency_seconds`
+
+Metric labels include:
+
+- `endpoint`
+- `model_version`
+- `model_family`
+- `status`
+
+Note: `GET /metrics` may redirect to `GET /metrics/`.
 
 ## Logging
 
-Prediction events are recorded in:
+File-based API metric logging is implemented in:
 
+```text
+ml/monitoring/metrics_file_logger.py
+```
+
+Prediction metric events are written to:
+
+```text
 artifacts/metrics/api_metrics.jsonl
+```
 
-Each record contains:
-
-- timestamp
-- endpoint
-- fraud probability
-- prediction result
+Logged events include request metadata such as endpoint, model version, model family, status, fraud probability, and prediction result when available.

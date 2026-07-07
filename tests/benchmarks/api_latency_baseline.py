@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 import json
@@ -16,7 +16,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 import api.main as api_main
-from artifacts.metrics.metrics_file_logger import log_api_metric
+from ml.monitoring.metrics_file_logger import log_api_metric
 
 
 DEFAULT_LOAD_LEVELS = [1, 5, 10, 25, 50]
@@ -413,3 +413,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

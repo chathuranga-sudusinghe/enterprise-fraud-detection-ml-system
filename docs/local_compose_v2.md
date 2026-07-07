@@ -164,3 +164,4 @@ api_request_latency_seconds
 - This Compose foundation does not change prediction logic.
 - This Compose foundation does not modify model artifacts.
 - Airflow services should be added later to the root `docker-compose.yml` in a dedicated branch.
+

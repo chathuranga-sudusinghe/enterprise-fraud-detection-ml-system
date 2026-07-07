@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import logging
@@ -9,7 +9,7 @@ import time
 
 from ml.inference.predict import FraudPredictor
 from ml.inference.predict_v2 import FraudPredictorV2
-from artifacts.metrics.metrics_file_logger import log_api_metric
+from ml.monitoring.metrics_file_logger import log_api_metric
 
 # -----------------------------
 # Logging Configuration
@@ -182,3 +182,4 @@ def predict_v2(transaction: TransactionInput):
         REQUEST_COUNT.labels(**V2_METRIC_LABELS, status="error").inc()
         REQUEST_LATENCY.labels(**V2_METRIC_LABELS, status="error").observe(latency)
         raise HTTPException(status_code=500, detail="Model v2 prediction error")
+

@@ -13,6 +13,7 @@ lakehouse/processed
 lakehouse/curated
 lakehouse/splits
 model_artifacts
+artifacts
 artifacts/runs
 artifacts/**/*.jsonl
 artifacts/**/*.log
@@ -21,3 +22,4 @@ notebooks
 tests
 terraform
 requirements_full.txt
+

@@ -1,4 +1,4 @@
-# Model v2 Production Readiness Report
+﻿# Model v2 Production Readiness Report
 
 ## 1. Executive Summary
 
@@ -120,7 +120,7 @@ Grafana readiness:
 
 - A Model v2 API dashboard JSON was added under `monitoring/grafana/dashboards/`.
 - Dashboard panels cover request rate, error rate, latency p50/p95/p99, v1 vs v2 request volume, and `/predict/v2` success/error split.
-- Dashboard queries use the active API metrics from `api/main.py`, not the older separate metrics in `observability/metrics.py`.
+- Dashboard queries use the active API metrics from `api/main.py`, not the older separate metrics in `ml/monitoring/metrics.py`.
 
 ## 7. Fallback And Rollback Readiness
 
@@ -219,3 +219,4 @@ Recommended checklist before sustained traffic:
 - Confirm Grafana dashboard import or provisioning.
 - Confirm rollback owner and rollback procedure.
 - Track the pandas fragmentation warning for a future optimization branch.
+
