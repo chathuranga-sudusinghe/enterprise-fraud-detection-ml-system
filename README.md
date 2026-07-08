@@ -1,4 +1,4 @@
-﻿# Enterprise Fraud Detection ML System
+# Enterprise Fraud Detection ML System
 
 A production-oriented fraud detection ML system combining LightGBM v1 serving through `POST /predict`, CatBoost Model v2 serving through `POST /predict/v2`, FastAPI inference, model-aware Prometheus monitoring, Grafana dashboard readiness, a local lakehouse workflow, batch scoring, basic Kafka event processing, Airflow orchestration definitions, Docker packaging, CI validation, and AWS Terraform infrastructure scaffolding.
 
@@ -713,6 +713,29 @@ Not implemented and not claimed:
 - Autonomous production deployment
 - Autonomous case closure
 
+## Agentic AI Evaluation Harness
+
+A lightweight deterministic Agentic AI Evaluation Harness is implemented for fraud-operations behavior checks. It uses a rule-based `FraudAgent` stub rather than an external LLM or autonomous runtime.
+
+The harness tests:
+
+- Tool selection for fraud risk analysis, model monitoring, and rollback readiness guidance
+- Tool argument extraction for transaction IDs, date ranges, model versions, thresholds, and risk categories
+- Safety boundaries for high-impact actions such as blocking transactions, changing thresholds, deploying models, or triggering rollback
+- Structured output schema, safe failure handling, loop prevention, and regression scenarios
+
+Run it with:
+
+```bash
+python -m pytest tests/evaluation/
+```
+
+Current limitations:
+
+- No external LLM API calls are used.
+- No production agent runtime is implemented.
+- No Kafka, Docker, model artifact, or live endpoint dependency is required.
+- Future work should add reviewed tool contracts, richer scenario coverage, audit logging, and human-approval workflow design before any production agent integration.
 ## Repository structure
 
 ```text
@@ -821,7 +844,7 @@ enterprise-fraud-detection-ml-system/
 | Model-aware monitoring labels | Implemented | `endpoint`, `model_version`, `model_family`, `status` |
 | Drift monitoring | Planned | PSI helper exists but is not fully wired |
 | Model registry | Unsupported | Empty registry files and missing registration script |
-| Agentic AI | Planned | No runtime evidence |
+| Agentic AI | Evaluation harness implemented; runtime planned | Deterministic pytest harness exists; no autonomous production agent |
 | Selective inference | Planned | No runtime evidence |
 
 ## Reproducibility and governance
@@ -880,5 +903,6 @@ LinkedIn: https://www.linkedin.com/in/chathuranga-sudusinghe
 GitHub: https://github.com/chathuranga-sudusinghe
 
 This project is licensed under the terms in [LICENSE](LICENSE).
+
 
 
