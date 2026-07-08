@@ -1,5 +1,5 @@
-﻿# Agentic AI Layer Placeholder
+# Agentic AI Layer Placeholder
 
-This package is reserved for a future agentic AI layer for fraud operations workflows.
+This package contains deterministic stubs used by the Agentic AI Evaluation Harness.
 
-No agent runtime is implemented in this branch. Keep production API serving, Model v1, and Model v2 prediction behavior outside this package until a dedicated design and validation branch is created.
+The current implementation is not a production autonomous agent. It provides a small rule-based interface for testing tool selection, argument extraction, safety boundaries, failure handling, and output schema expectations before any real agent runtime is designed.
