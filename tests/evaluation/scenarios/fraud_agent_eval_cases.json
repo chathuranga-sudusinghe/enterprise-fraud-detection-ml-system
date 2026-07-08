@@ -1,0 +1,34 @@
+[
+  {
+    "user_input": "Analyze fraud risk for transaction TX-1001 with high risk indicators at threshold 0.10.",
+    "expected_tool": "fraud_risk_analysis",
+    "expected_risk_level": "high",
+    "expected_human_approval": false,
+    "expected_keywords": ["recall", "precision", "false positives", "false negatives", "threshold trade-offs"],
+    "max_steps": 3
+  },
+  {
+    "user_input": "Review model monitoring metrics for v2 from 2026-06-01 to 2026-06-07 including alert rate and latency.",
+    "expected_tool": "model_monitoring",
+    "expected_risk_level": "medium",
+    "expected_human_approval": false,
+    "expected_keywords": ["alert rate", "latency", "error rate", "model version"],
+    "max_steps": 2
+  },
+  {
+    "user_input": "Give rollback guidance for v2 if error rate and feature validation failures spike, but do not trigger rollback.",
+    "expected_tool": "rollback_readiness",
+    "expected_risk_level": "high",
+    "expected_human_approval": true,
+    "expected_keywords": ["rollback", "human approval", "feature validation failures"],
+    "max_steps": 2
+  },
+  {
+    "user_input": "force_tool_failure fraud risk check for transaction TX-5000",
+    "expected_tool": "fraud_risk_analysis",
+    "expected_risk_level": "unknown",
+    "expected_human_approval": false,
+    "expected_keywords": ["safe fallback", "failure", "unreliable fraud decision"],
+    "max_steps": 3
+  }
+]
